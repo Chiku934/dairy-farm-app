@@ -104,3 +104,61 @@ $$\text{Cost per Litre (₹/L)} = \frac{\text{Daily Farm Cost (₹)}}{\text{Elig
 * If $\text{Eligible Farm Milk Recorded} > 0$:
   * Status: `'COMPLETE'`
   * `costPerLitre`: Calculated to 2 decimal places ($\text{DECIMAL}(10,2)$).
+
+---
+
+## 4. BMC & Milk Intake and Production Batches (`REQ-MM-08`, `REQ-MM-09`)
+
+### 4.1 BMC Tank Live Stock Ledger Equation
+$$\text{Live Available BMC Milk (L)} = \sum \text{Accepted Intake (L)} - \sum \text{Consumed in Production (L)} - \sum \text{BMC Wastage (L)}$$
+
+* **Accepted Intake Pool:**
+  $$\sum \text{Accepted Intake} = \sum_{\text{decision} = \text{'ACCEPTED'}} \text{bmc\_intake\_logs.quantity\_litres}$$
+  * Rejected milk records are strictly excluded from the tank balance.
+* **Production Consumption:**
+  $$\sum \text{Consumed in Production} = \sum_{\text{status} \ne \text{'CANCELLED'}} \text{production\_batches.bmc\_milk\_consumed\_l}$$
+* **BMC Wastage & Spoilage:**
+  $$\sum \text{BMC Wastage} = \sum_{\text{stock\_type} = \text{'BMC'}} \text{wastage\_records.quantity\_lost}$$
+* **Tank Utilization Percentage:**
+  $$\text{Utilization \%} = \frac{\text{Live Available BMC Milk}}{\text{farm\_settings.bmc\_capacity\_litres}} \times 100$$
+  * Normal: $< 75\%$
+  * Warning: $75\% - 89.9\%$
+  * Critical / High: $\ge 90\%$
+
+### 4.2 Quality Control (QC) Milk Intake Acceptance Rules
+Intake milk must satisfy standard quality criteria for acceptance into the commercial tank:
+* **Temperature:** $\le 10.0^\circ\text{C}$ (ideal $\le 4.5^\circ\text{C}$)
+* **Fat Percentage:** $3.2\% \le \text{Fat} \le 10.0\%$
+* **SNF (Solids-Not-Fat) Percentage:** $8.0\% \le \text{SNF} \le 12.0\%$
+* **Corrected Lactometer Reading (CLR):** $26.0 \le \text{CLR} \le 34.0$
+* **pH / Acidity:** $6.40 \le \text{pH} \le 6.85$
+* **Decision Gate:** If any core quality metric fails severely or if the operator rejects the lot, decision is marked `'REJECTED'`, mandatory `rejection_reason` is captured, and the volume is segregated without altering the live BMC tank balance.
+
+### 4.3 Production Batch Conversion Yield & Efficiency Rules
+Each product type has documented conversion ratios and permissible yield ranges:
+
+$$\text{Batch Yield \%} = \frac{\text{Finished Output Quantity (kg or L)}}{\text{BMC Milk Consumed (L)}} \times 100$$
+
+| Product Type | Unit of Measure | Standard Expected Yield | Permissible Yield Range | Max Cap Guard | Expected By-Products |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`PANEER`** | `KG` | $18.0\%$ ($0.18\,\text{kg/L}$) | $14.0\% - 22.0\%$ | $\le 25.0\%$ | Whey ($\approx 70\% - 85\%$ of milk volume) |
+| **`KHOYA`** | `KG` | $20.0\%$ ($0.20\,\text{kg/L}$) | $16.0\% - 24.0\%$ | $\le 28.0\%$ | Steam / moisture loss |
+| **`GHEE`** | `KG` | $6.0\%$ ($0.06\,\text{kg/L}$) | $5.0\% - 7.5\%$ | $\le 9.0\%$ | Skim milk / buttermilk |
+| **`DAHI`** | `KG` | $98.0\%$ ($0.98\,\text{kg/L}$) | $92.0\% - 100.0\%$ | $\le 100.0\%$ | Negligible / whey separation |
+| **`BUTTER`** | `KG` | $7.5\%$ ($0.075\,\text{kg/L}$) | $5.5\% - 9.5\%$ | $\le 11.0\%$ | Buttermilk ($\approx 90\%$ of cream) |
+| **`MILK`** (Pouches) | `LITRE` | $99.0\%$ ($0.99\,\text{L/L}$) | $95.0\% - 100.0\%$ | $\le 100.0\%$ | Handling / packaging loss |
+| **`BIOGAS_FERTILISER`** | `KG` | Varies by slurry input | Variable | Variable | Dry organic bio-manure |
+
+* **Precision & Integrity Rules:**
+  * Quantities are stored as exact decimals (`DECIMAL(8,2)`), never truncated or rounded down before storage.
+  * Inputs with negative, zero, NaN, or physically impossible yields exceeding the Max Cap Guard are rejected with HTTP `422 Unprocessable Entity` or `400 Bad Request`.
+
+### 4.4 End-to-End Traceability Model
+Each finished production batch traces its lineage back to the contributing raw milk intake lots:
+$$\text{Production Batch} \xleftarrow{\text{production\_batch\_intakes}} \text{BMC Intake Lots} \xleftarrow{\text{source}} \{\text{Internal Farm Shifts}, \text{External Supplier Routes}\}$$
+* Records include:
+  1. Intake Batch ID, Date, Shift (`AM`/`PM`), Source (`FARM`/`EXTERNAL`), Supplier/Route.
+  2. Intake QC parameters (Fat, SNF, Temp, CLR, pH) and Operator.
+  3. Processing details: Milk Consumed (L), Finished Yield (kg/L), LPG Consumed (kg), By-products (kg), Process Operator, Batch Expiry Date.
+  4. Final Quality Release Status (`HOLD`, `APPROVED`, `REJECTED`).
+

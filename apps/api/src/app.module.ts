@@ -15,6 +15,8 @@ import { BreedingModule } from './modules/breeding/breeding.module';
 import { MilkingModule } from './modules/milking/milking.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { CostingModule } from './modules/costing/costing.module';
+import { BmcModule } from './modules/bmc/bmc.module';
+import { ProductionModule } from './modules/production/production.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { CostingModule } from './modules/costing/costing.module';
     MilkingModule,
     FeedModule,
     CostingModule,
+    BmcModule,
+    ProductionModule,
   ],
 })
 export class AppModule {}

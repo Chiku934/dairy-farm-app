@@ -66,9 +66,21 @@ export enum MilkIntakeSource {
   EXTERNAL = 'EXTERNAL',
 }
 
+export enum IntakeShift {
+  AM = 'AM',
+  PM = 'PM',
+}
+
 export enum Decision {
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
+}
+
+export enum BatchStatus {
+  PLANNED = 'PLANNED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
 }
 
 export enum ProductType {

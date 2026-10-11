@@ -5,6 +5,9 @@ import '../features/herd/presentation/herd_screen.dart';
 import '../features/milking/presentation/milking_screen.dart';
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/costing/presentation/costing_screen.dart';
+import '../features/bmc/presentation/bmc_screen.dart';
+import '../features/production/presentation/production_screen.dart';
+import '../features/production/presentation/batch_detail_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -84,11 +87,19 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/bmc',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'BMC & Milk Intake', path: '/bmc'),
+      builder: (context, state) => const BmcScreen(),
     ),
     GoRoute(
       path: '/batches',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Production Batches', path: '/batches'),
+      builder: (context, state) => const ProductionScreen(),
+    ),
+    GoRoute(
+      path: '/batches/:id',
+      builder: (context, state) => BatchDetailScreen(batchId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/production',
+      builder: (context, state) => const ProductionScreen(),
     ),
     GoRoute(
       path: '/packaging',

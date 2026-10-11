@@ -108,4 +108,5 @@ class AppColors {
   static const Color accentEmerald = emerald;
   static const Color accentMint = mint;
   static const Color accentTeal = Color(0xFF0D9488);
+  static const Color success = statusSuccess;
 }
