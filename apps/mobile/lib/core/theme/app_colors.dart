@@ -17,6 +17,12 @@ class AppColors {
   static const Color primary100 = Color(0xFFDCFCE7); // Light badge fills
   static const Color primary50 = Color(0xFFF0FDF4);  // Subtle green tint surfaces
 
+  // Semantic Aliases
+  static const Color primary = primary700;
+  static const Color secondary = primary500;
+  static const Color danger = statusDanger;
+  static const Color surface = cardSurface;
+
   // Warm White & Soft Neutral Canvas
   static const Color background = Color(0xFFF7F8F5);     // Warm white screen background
   static const Color surfaceWarm = Color(0xFFFAFAF7);    // Slightly elevated warm container

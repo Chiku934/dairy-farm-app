@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../features/dashboard/presentation/overview_screen.dart';
 import '../features/herd/presentation/herd_screen.dart';
+import '../features/milking/presentation/milking_screen.dart';
+import '../features/feed/presentation/feed_screen.dart';
+import '../features/costing/presentation/costing_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -61,7 +64,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/milking',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Milking Log', path: '/milking'),
+      builder: (context, state) => const MilkingScreen(),
     ),
     GoRoute(
       path: '/health',
@@ -73,11 +76,11 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/feed',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Feed & Ration Planning', path: '/feed'),
+      builder: (context, state) => const FeedScreen(),
     ),
     GoRoute(
       path: '/costing',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Unit Costing', path: '/costing'),
+      builder: (context, state) => const CostingScreen(),
     ),
     GoRoute(
       path: '/bmc',

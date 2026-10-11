@@ -12,6 +12,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HerdModule } from './modules/herd/herd.module';
 import { AnimalHealthModule } from './modules/animal-health/animal-health.module';
 import { BreedingModule } from './modules/breeding/breeding.module';
+import { MilkingModule } from './modules/milking/milking.module';
+import { FeedModule } from './modules/feed/feed.module';
+import { CostingModule } from './modules/costing/costing.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { BreedingModule } from './modules/breeding/breeding.module';
     HerdModule,
     AnimalHealthModule,
     BreedingModule,
+    MilkingModule,
+    FeedModule,
+    CostingModule,
   ],
 })
 export class AppModule {}
