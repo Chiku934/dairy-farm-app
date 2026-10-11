@@ -1,48 +1,53 @@
-# Dairy Farm Management System - Open Questions & Technical Clarifications
+# Dairy Farm Management System - Open Questions & Unresolved Calculation Rules
 
 ## 1. Domain Calculations & Costing Formulas
 
-1. **Asset Depreciation & Capital Expenditure:**
-   * *Observation:* The current daily farm milk costing formula includes feed, medicines, consumables, electricity, direct labor, and operating expenses:
-     $$\text{Daily Farm Cost} = \text{Feed} + \text{Meds} + \text{Materials} + \text{Salaries} + \text{Power} + \text{Expenses}$$
-   * *Question:* Should long-term capital assets (cattle acquisition depreciation, milking parlor machinery, chilling plant capital depreciation) be factored into the daily unit cost per litre, or is the client operating strictly on cash operational expenditure (OpEx)?
-2. **Dynamic Concentrate Target Calculation:**
-   * *Observation:* Video 2 states concentrate rule uses average yield on recorded days over the last 7 days:
-     $$\text{Target} = \min(1.0 + (\text{AvgYield} \times 0.4), 8.0)$$
-   * *Question:* For newly calved cows or heifers with fewer than 7 days of historical milking records, how should the concentrate formula initialize? (e.g., use lifetime average or default base of 1.0 kg?).
-3. **By-Product Economic Value Allocation:**
-   * *Observation:* During paneer, khoya, or ghee production, by-products (whey, buttermilk) are recorded in kilograms.
-   * *Question:* Does whey have a monetary credit value offset against the main batch cost, or is it treated solely as zero-value agricultural waste / biogas slurry feedstock?
+### 1.1 BMC Intake Milk Solids-Not-Fat (SNF) Empirical Formula
+* **Context:** Milk testing at reception records Fat %, CLR (Corrected Lactometer Reading at 20°C / 29°C), and computes SNF %.
+* **Unresolved Rule:** There are multiple empirical standards in Indian dairy practice:
+  1. *Richmond's Formula:* $\text{SNF} = 0.25 \times \text{CLR} + 0.20 \times \text{Fat} + 0.36$
+  2. *BIS Standard (IS:11833):* $\text{SNF} = 0.25 \times \text{CLR} + 0.21 \times \text{Fat} + 0.36$ (for cow milk) and $\text{SNF} = 0.25 \times \text{CLR} + 0.22 \times \text{Fat} + 0.72$ (for buffalo milk).
+* **Current Action:** The system allows manual or measured entry of SNF % and does not hardcode an unapproved auto-calculation formula until the client confirms their calibrated lactometer standard.
+
+### 1.2 Fresh Calver Daily Concentrate Ration Initialization
+* **Context:** The standard target concentrate formula uses the 7-day average milk yield:
+  $$\text{Target} = \min(\text{FeedBase} + (\text{AvgYield}_{7d} \times \text{FeedRate}), \text{FeedMaxCap})$$
+* **Unresolved Rule:** For cows or heifers in their first 1 to 6 days post-calving, no 7-day historical milking average exists.
+* **Open Options:**
+  - Option A: Use the average of available recorded days since calving.
+  - Option B: Use the base ration ($\text{FeedBase} = 1.0\text{ kg}$) until day 7.
+  - Option C: Use a fixed fresh-cow transition allowance (e.g. 3.0 kg).
+* **Current Action:** Target is computed as base ration when historical records are under 3 days, pending farm nutritionist approval.
+
+### 1.3 Biogas Dung-to-Dry-Fertiliser Conversion Factor
+* **Context:** Digested slurry outputs from biogas digestion are dried into packaged organic fertiliser.
+* **Unresolved Rule:** Slurry is ~90% moisture, and dry organic fertiliser is ~15-20% moisture. The client prototype mentions dry fertiliser output without specifying the exact loss evaporation factor or curing time cycle.
+* **Current Action:** Dry fertilizer production is entered manually as measured output from drying beds, not auto-calculated from raw slurry.
+
+### 1.4 Overhead Utility Allocation During Meter Outages
+* **Context:** Electricity tariff default is ₹1.40/kWh, split between Farm (50 kWh default) and Production (200 kWh default).
+* **Unresolved Rule:** In the event of meter reading failure or sub-meter breakdown, should the system fall back strictly to farm settings defaults or proportionally scale to milk volume processed?
+* **Current Action:** Uses farm settings explicit defaults (`farm_default_kwh`, `production_default_kwh`) with audit logging.
 
 ---
 
-## 2. Inventory & Stock Rules
+## 2. Inventory & Valuation Methods
 
-1. **Inventory Valuation Methodology:**
-   * *Observation:* Common Inventory displays "average purchase price" from stock receipts.
-   * *Question:* Should material deductions (e.g. feed issues, packaging consumption) strictly execute on **Periodic Weighted Average Cost (WAC)** or **First-In, First-Out (FIFO)** lot depletion?
-2. **Packaging Scrap & Tare Weight:**
-   * *Observation:* Packaging forms allow entering packaging items and net pack weight.
-   * *Question:* Is a fixed scrap allowance percentage (e.g. 2% pouch bursting tolerance on packaging machine) permitted, or should all broken packaging materials be logged explicitly through the *Wastage & Losses* module?
+### 2.1 Perpetual Weighted Average Cost (WAC) vs FIFO Depletion
+* **Context:** Inbound stock receipts record unit purchase prices which fluctuate across vendor deliveries.
+* **Unresolved Rule:** Does the farm accountant require strict batch-level FIFO tracking (depleting oldest lots first) or moving Weighted Average Cost (`current_stock` updated on each receipt)?
+* **Current Action:** Database supports moving Weighted Average Cost via `weighted_avg_price` on `stock_items` and double-entry ledger in `stock_ledger_entries`.
 
----
-
-## 3. Quality Parameters & Quality Gates
-
-1. **FSSAI Parameter Enforcement:**
-   * *Observation:* BMC intake modal accepts manual `Decision: Accepted / Rejected` alongside Fat %, SNF %, CLR, pH, and Temperature.
-   * *Question:* Should the system automatically enforce rejection if parameters fall below FSSAI statutory standards (e.g. Cow milk Fat < 3.2% or SNF < 8.3%), or is the operator permitted to override and accept?
-2. **Quality Release Gate on Production Batches:**
-   * *Observation:* Production batches are created with `Quality release: Hold`.
-   * *Question:* Does an unreleased batch strictly block packaging and sales dispatch on the backend API, or does it trigger an advisory warning?
+### 2.2 Packaging Scrap & Bursting Allowance
+* **Context:** Milk pouch rolls and paneer vacuum pouches frequently incur ~1-2% machine setup scrap.
+* **Unresolved Rule:** Should scrap be auto-deducted as an invisible operational percentage, or must operators log burst pouches through the explicit *Wastage & Losses* module?
+* **Current Action:** Operators log actual packaging units consumed in packaging runs; discrepancies are reported in `wastage_records`.
 
 ---
 
-## 4. User Roles & Multi-Tenancy Scope
+## 3. Statutory & Quality Gates
 
-1. **Multi-Role Assignment:**
-   * *Observation:* On smaller dairy farms, a single person (e.g. Farm Manager) often performs veterinary entries, stock receipts, and production supervision.
-   * *Question:* Can individual user accounts hold multiple roles concurrently, and if so, how should the UI drawer adapt (show all assigned options)?
-2. **Platform & Offline Sync Scope:**
-   * *Observation:* Farm rural environments frequently experience intermittent 4G/WiFi connectivity.
-   * *Question:* Should the Flutter application incorporate local SQLite/Hive caching with offline draft queuing and background synchronization, or does the contract baseline assume online-first REST API connectivity?
+### 3.1 Statutory Rejection Override Authority
+* **Context:** FSSAI statutory minimums require Cow milk Fat $\ge 3.2\%$ and $\text{SNF} \ge 8.3\%$.
+* **Unresolved Rule:** If an incoming milk batch fails these parameters, can a privileged role (e.g. `FARM_MANAGER` or `FARM_OWNER`) manually override and accept the milk at a discounted rate, or is it a hard system block?
+* **Current Action:** System records `decision: REJECTED` with organoleptic notes and permits manual manager approval override with full audit trail entry.

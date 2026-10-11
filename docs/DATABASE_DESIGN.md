@@ -1,245 +1,156 @@
 # Dairy Farm Management System - Database Design Specification
 
-## 1. Schema Overview
+## 1. Executive Summary & Design Principles
 
-The database uses **MySQL 8.0+** with the **InnoDB** storage engine, `utf8mb4_unicode_ci` character set, and strict ACID transaction semantics. The schema models all 24 business modules, ensuring referential integrity, double-entry stock reconciliation, and auditable historical records.
+The database architecture is designed for **MySQL 8.0+ / MariaDB 10.4+** using the **InnoDB** storage engine with `utf8mb4_unicode_ci` character encoding and strict ACID transaction semantics. It spans all 24 operational modules across the 3 core business domains plus the foundational security and metadata infrastructure.
+
+### Core Architectural Standards
+1. **Migration-First Governance:** Schema changes are exclusively managed via deterministic SQL migration files (`database/migrations/`). Automatic destructive ORM synchronization (`synchronize: true`) is **strictly forbidden**.
+2. **Precision & Money Standards:** Financial values, currency totals, and physical quantities are stored strictly as `DECIMAL(10,2)` or `DECIMAL(8,2)` with custom TypeORM column transformers to eliminate floating-point rounding errors.
+3. **Temporal Uniformity:** All operational dates are recorded as `DATE` (ISO `YYYY-MM-DD`). System timestamps use `DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`.
+4. **Relational Constraints & Foreign Keys:** Full referential integrity is enforced with cascading semantics (`ON DELETE CASCADE` for tightly bound child sessions/items; `ON DELETE RESTRICT` or `ON DELETE SET NULL` for audit/master data).
+5. **Double-Entry Stock Tracking:** Inventory movements flow through `stock_ledger_entries` with matching inbound receipts, material issues, packaging consumption, and wastage write-offs.
+6. **Isolated Test Database:** Automated testing executes strictly against `dairy_farm_test_db`, guaranteeing production and development databases are never modified by test runs.
+
+---
+
+## 2. Complete Entity Relationship Overview
 
 ```mermaid
 erDiagram
+    %% Foundation & RBAC
     USERS ||--o{ USER_ROLES : has
     ROLES ||--o{ USER_ROLES : assigned
+    ROLES ||--o{ ROLE_PERMISSIONS : defines
+    PERMISSIONS ||--o{ ROLE_PERMISSIONS : maps
+    USERS ||--o{ USER_SESSIONS : establishes
+    USERS ||--o{ AUDIT_LOGS : performs
     
+    %% Master Lookups & Units
+    LOOKUP_CATEGORIES ||--o{ LOOKUP_VALUES : groups
+    UNITS_OF_MEASUREMENT ||--o{ STOCK_ITEMS : measures
+    
+    %% Herd & Milking
     ANIMALS ||--o{ MILKING_LOGS : yields
     ANIMALS ||--o{ HEALTH_RECORDS : treated
     ANIMALS ||--o{ BREEDING_RECORDS : bred
     ANIMALS ||--o{ FEED_ENTRIES : consumed
     
-    STOCK_ITEMS ||--o{ STOCK_RECEIPTS : receives
-    STOCK_ITEMS ||--o{ STOCK_LEDGER : tracks
-    STOCK_ITEMS ||--o{ MATERIAL_ISSUES : issued
-    
-    BMC_INTAKE_LOGS ||--o{ BMC_TANK_LEDGER : affects
+    %% Milk Intake & Processing
+    BMC_INTAKE_LOGS ||--o{ QUALITY_RECORDS : inspected
     PRODUCTION_BATCHES ||--o{ PACKAGING_RUNS : packages
-    PACKAGING_RUNS ||--o{ PACKAGED_STOCK_LEDGER : creates
+    PRODUCTION_BATCHES ||--o{ QUALITY_RECORDS : verified
     
+    %% Inventory & Materials
+    STOCK_ITEMS ||--o{ STOCK_RECEIPTS : receives
+    STOCK_ITEMS ||--o{ STOCK_LEDGER_ENTRIES : tracks
+    STOCK_ITEMS ||--o{ MATERIAL_ISSUES : issues
+    STOCK_ITEMS ||--o{ WASTAGE_RECORDS : writes_off
+    
+    %% Sales & Commercial
     CUSTOMERS ||--o{ SALES_ORDERS : places
     SALES_ORDERS ||--o{ SALES_DISPATCHES : fulfills
     SALES_DISPATCHES ||--o{ CUSTOMER_PAYMENTS : settles
     
-    EMPLOYEES ||--o{ DAILY_LABOR_ALLOCATIONS : contributes
-    OPERATING_EXPENSES ||--o{ DAILY_COSTING_SUMMARY : calculates
+    %% Operations & HR
+    EMPLOYEES ||--o{ OPERATING_EXPENSES : incurs
+    FARM_SETTINGS ||--o{ ELECTRICITY_READINGS : applies_rates
 ```
 
 ---
 
-## 2. Table Definitions & Data Dictionary
+## 3. Data Dictionary: Foundation & Common Architecture
 
-### 2.1 Identity & Access Management
-
-#### `users`
+### 3.1 `farm_settings`
+Master enterprise identity, operational parameters, and utility tariff defaults.
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Unique user identifier |
-| `email` | VARCHAR(120) | UNIQUE, NOT NULL | Login identity / email |
-| `password_hash` | VARCHAR(255) | NOT NULL | Bcrypt hash |
-| `full_name` | VARCHAR(100) | NOT NULL | User's full name |
-| `phone` | VARCHAR(20) | NULL | Contact phone number |
-| `is_active` | BOOLEAN | DEFAULT TRUE | Account active status |
-| `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Timestamp |
-| `updated_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Timestamp |
-
-#### `roles`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK | Unique role identifier |
-| `code` | VARCHAR(50) | UNIQUE, NOT NULL | e.g. `FARM_OWNER`, `FARM_MANAGER`, `ANIMAL_CARE`, `ACCOUNTANT` |
-| `name` | VARCHAR(100) | NOT NULL | Human readable title |
-| `description` | TEXT | NULL | Scope summary |
-
-#### `user_roles`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `user_id` | VARCHAR(36) | FK -> `users.id`, PK | User identifier |
-| `role_id` | VARCHAR(36) | FK -> `roles.id`, PK | Role identifier |
-
----
-
-### 2.2 Domain A: Your Dairy (Herd & Farm Operations)
-
-#### `animals`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Animal primary key |
-| `ear_tag` | VARCHAR(50) | UNIQUE, NOT NULL | Physical ear tag / RFID code |
-| `name` | VARCHAR(100) | NULL | Name of animal (e.g. "Ganga") |
-| `breed` | VARCHAR(50) | NOT NULL | e.g. "HF", "Jersey", "Gir", "Murrah" |
-| `sex` | ENUM('FEMALE', 'MALE') | NOT NULL | Sex |
-| `date_of_birth` | DATE | NULL | Date of birth |
-| `status` | ENUM('LACTATING', 'DRY', 'PREGNANT', 'HEIFER', 'CALF', 'BULL', 'SOLD', 'DECEASED') | NOT NULL | Current lifecycle status |
-| `body_weight_kg` | DECIMAL(6,2) | NULL | Live weight |
-| `dam_tag` | VARCHAR(50) | NULL | Mother ear tag |
-| `last_calving_date` | DATE | NULL | Date of most recent calving |
-| `body_condition_score` | DECIMAL(3,1) | NULL | Score (1.0 to 5.0) |
-| `notes` | TEXT | NULL | Additional observation notes |
-| `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Audit timestamp |
-
-#### `milking_logs`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Record ID |
-| `animal_id` | VARCHAR(36) | FK -> `animals.id`, NOT NULL | Cow reference |
-| `record_date` | DATE | NOT NULL, INDEX | Milking date |
-| `session` | ENUM('MORNING', 'EVENING') | NOT NULL | Milking shift |
-| `yield_litres` | DECIMAL(6,2) | NOT NULL | Volume milked in litres |
-| `disposition` | ENUM('ELIGIBLE', 'WITHHELD', 'CALF_FEEDING') | NOT NULL | Eligibility for collection pool |
-| `withheld_reason` | VARCHAR(255) | NULL | Stated reason if withheld |
-| `notes` | TEXT | NULL | Shift observations |
-| `created_by` | VARCHAR(36) | FK -> `users.id` | User who logged record |
-
-#### `health_records`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Record ID |
-| `animal_id` | VARCHAR(36) | FK -> `animals.id`, NOT NULL | Animal reference |
-| `record_date` | DATE | NOT NULL | Date care administered |
-| `care_type` | ENUM('TREATMENT', 'VACCINATION', 'DEWORMING', 'EXAMINATION') | NOT NULL | Type of intervention |
-| `medicine_vaccine` | VARCHAR(120) | NOT NULL | Product administered |
-| `prescribed_dose` | VARCHAR(100) | NOT NULL | Dosage instructions |
-| `veterinarian` | VARCHAR(100) | NULL | Vet name |
-| `next_due_date` | DATE | NULL | Next scheduled booster/follow-up |
-| `withdrawal_until` | DATE | NULL | Date until which milk must be withheld |
-| `stock_item_id` | VARCHAR(36) | FK -> `stock_items.id`, NULL | Inventory item linked |
-| `stock_qty_used` | DECIMAL(8,2) | NULL | Quantity deducted from inventory |
-| `notes` | TEXT | NULL | Clinical observations |
-
-#### `breeding_records`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Record ID |
-| `animal_id` | VARCHAR(36) | FK -> `animals.id`, NOT NULL | Cow reference |
-| `record_date` | DATE | NOT NULL | Date event observed |
-| `event_type` | ENUM('HEAT', 'INSEMINATION', 'PREGNANCY_CONFIRMED', 'PREGNANCY_CHECK', 'CALVING', 'DRY_OFF') | NOT NULL | Lifecycle event |
-| `sire_semen_id` | VARCHAR(100) | NULL | Semen straw/bull tag |
-| `expected_calving_date` | DATE | NULL | Computed/recorded expected calving |
-| `calf_tag` | VARCHAR(50) | NULL | Resulting calf tag |
-| `notes` | TEXT | NULL | Details |
-
-#### `feed_entries`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Record ID |
-| `animal_id` | VARCHAR(36) | FK -> `animals.id`, NOT NULL | Target cow |
-| `record_date` | DATE | NOT NULL | Issue date |
-| `stock_item_id` | VARCHAR(36) | FK -> `stock_items.id`, NOT NULL | Feed inventory item |
-| `quantity_kg` | DECIMAL(8,2) | NOT NULL | Quantity issued |
-| `feed_type` | ENUM('CONCENTRATE', 'GREEN_FODDER', 'DRY_FODDER', 'MINERAL_MIXTURE', 'SALT', 'MAIZE', 'CALF_STARTER') | NOT NULL | Nutritional category |
-| `notes` | TEXT | NULL | Notes |
-
----
-
-### 2.3 Domain B: Milk to Market (Processing & Commercial)
-
-#### `bmc_intake_logs`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Intake ID |
-| `batch_number` | VARCHAR(50) | UNIQUE, NOT NULL | e.g. `KD-IN-20261001-0001` |
-| `record_date` | DATE | NOT NULL | Intake date |
-| `source` | ENUM('FARM', 'EXTERNAL') | NOT NULL | Origin of milk |
-| `supplier_route` | VARCHAR(120) | NULL | Route or supplier name |
-| `quantity_litres` | DECIMAL(8,2) | NOT NULL | Intake volume |
-| `external_total_cost` | DECIMAL(10,2) | DEFAULT 0.00 | Cost if bought externally |
-| `decision` | ENUM('ACCEPTED', 'REJECTED') | NOT NULL | QC gate decision |
-| `temperature_c` | DECIMAL(4,1) | NULL | Milk temperature (°C) |
-| `fat_percentage` | DECIMAL(4,2) | NULL | Measured Fat % |
-| `snf_percentage` | DECIMAL(4,2) | NULL | Measured Solids-Not-Fat % |
-| `clr` | DECIMAL(5,2) | NULL | Corrected Lactometer Reading |
-| `ph` | DECIMAL(3,2) | NULL | Acidity measurement |
-| `quality_notes` | TEXT | NULL | Organoleptic or adulteration notes |
-
-#### `production_batches`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Batch ID |
-| `batch_number` | VARCHAR(50) | UNIQUE, NOT NULL | Batch reference code |
-| `record_date` | DATE | NOT NULL | Batch production date |
-| `product_type` | ENUM('MILK', 'PANEER', 'KHOYA', 'GHEE', 'DAHI', 'BUTTER', 'BIOGAS_FERTILISER') | NOT NULL | Output product |
-| `bmc_milk_consumed_l` | DECIMAL(8,2) | NOT NULL | Raw milk used from BMC |
-| `finished_quantity` | DECIMAL(8,2) | NOT NULL | Output volume (L) or weight (kg) |
-| `unit_of_measure` | ENUM('LITRE', 'KG') | NOT NULL | Output unit |
-| `lpg_stock_item_id` | VARCHAR(36) | FK -> `stock_items.id`, NULL | LPG cylinder stock item |
-| `lpg_used_kg` | DECIMAL(6,2) | DEFAULT 0.00 | Fuel weight consumed |
-| `byproduct_quantity_kg` | DECIMAL(8,2) | DEFAULT 0.00 | Yield of byproducts (e.g. whey, buttermilk) |
-| `process_record` | TEXT | NULL | Pasteurisation / cooking log |
-| `expiry_date` | DATE | NOT NULL | Batch use-by date |
-| `quality_release` | ENUM('HOLD', 'APPROVED', 'REJECTED') | DEFAULT 'HOLD' | QC release gate |
-| `allocated_overhead_cost`| DECIMAL(10,2) | DEFAULT 0.00 | Allocated electricity and labor |
-
-#### `packaging_runs`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Packaging run ID |
-| `record_date` | DATE | NOT NULL | Run date |
-| `production_batch_id`| VARCHAR(36) | FK -> `production_batches.id`, NOT NULL | Sourced bulk batch |
-| `pack_size` | DECIMAL(6,2) | NOT NULL | Pack size (e.g. 0.50 L, 1.00 kg) |
-| `pack_unit` | ENUM('LITRE', 'KG') | NOT NULL | Measurement unit |
-| `number_of_packs` | INT | NOT NULL | Finished retail units produced |
-| `packaging_item_id` | VARCHAR(36) | FK -> `stock_items.id`, NOT NULL | Packaging material (pouches, bottles) |
-| `material_consumed` | DECIMAL(8,2) | NOT NULL | Packaging materials deducted |
-| `notes` | TEXT | NULL | Operational notes |
-
-#### `sales_orders` & `sales_dispatches`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Transaction ID |
-| `record_date` | DATE | NOT NULL | Transaction date |
-| `customer_name` | VARCHAR(120) | NOT NULL | Customer / shop title |
-| `customer_phone` | VARCHAR(20) | NULL | Contact number |
-| `packaging_run_id` | VARCHAR(36) | FK -> `packaging_runs.id`, NULL | Packaged stock source |
-| `packs_sold` | INT | NOT NULL | Count of packs delivered |
-| `price_per_pack` | DECIMAL(8,2) | NOT NULL | Unit sale price |
-| `total_amount` | DECIMAL(10,2) | NOT NULL | `packs_sold` $\times$ `price_per_pack` |
-| `amount_received` | DECIMAL(10,2) | DEFAULT 0.00 | Upfront payment collected |
-| `balance_due` | DECIMAL(10,2) | NOT NULL | `total_amount` - `amount_received` |
-
----
-
-### 2.4 Domain C: Business & Operations
-
-#### `stock_items` & `stock_receipts`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Stock item ID |
-| `name` | VARCHAR(120) | UNIQUE, NOT NULL | Material name |
-| `used_by` | ENUM('FARM', 'PRODUCTION', 'BIOGAS', 'BOTH') | NOT NULL | Department classification |
-| `category` | ENUM('FEED', 'MEDICINE', 'PACKAGING', 'LPG', 'CLEANING', 'PROCESSING_INGREDIENT', 'CONSUMABLE', 'SPARE_PART', 'OTHER') | NOT NULL | Material category |
-| `unit` | VARCHAR(20) | NOT NULL | e.g. `kg`, `L`, `units`, `rolls` |
-| `current_stock` | DECIMAL(10,2) | DEFAULT 0.00 | Live perpetual inventory balance |
-| `weighted_avg_price`| DECIMAL(10,2) | DEFAULT 0.00 | Cost per unit from receipts |
-| `reorder_level` | DECIMAL(10,2) | DEFAULT 0.00 | Safety threshold for alerts |
-
-#### `employees`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(36) | PK, UUID | Employee ID |
-| `employee_code` | VARCHAR(20) | UNIQUE, NOT NULL | e.g. `002`, `10` |
-| `full_name` | VARCHAR(120) | NOT NULL | Employee name |
-| `department` | ENUM('FARM', 'PRODUCTION', 'BIOGAS', 'MANAGEMENT') | NOT NULL | Cost allocation department |
-| `job_title` | VARCHAR(100) | NOT NULL | Role/designation |
-| `joining_date` | DATE | NOT NULL | Start date |
-| `monthly_salary` | DECIMAL(10,2) | NOT NULL | Gross monthly compensation |
-| `daily_salary_rate` | DECIMAL(8,2) | AS (`monthly_salary` / 30.00) STORED | Auto-computed daily rate |
-| `is_active` | BOOLEAN | DEFAULT TRUE | Employment status |
-
-#### `farm_settings`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | INT | PK, DEFAULT 1 | Single-row configuration table |
-| `bmc_capacity_litres`| DECIMAL(8,2) | NOT NULL, DEFAULT 2000.00 | Maximum capacity of BMC tank |
-| `feed_base_kg` | DECIMAL(4,2) | NOT NULL, DEFAULT 1.00 | Base concentrate feed |
-| `feed_rate_per_litre`| DECIMAL(4,2) | NOT NULL, DEFAULT 0.40 | Concentrate factor per L milk |
-| `feed_max_cap_kg` | DECIMAL(4,2) | NOT NULL, DEFAULT 8.00 | Maximum concentrate cap |
-| `electricity_tariff` | DECIMAL(6,2) | NOT NULL, DEFAULT 1.40 | Cost per kWh unit (₹) |
+| `id` | INT | PK, DEFAULT 1 | Single-row singleton configuration table |
+| `farm_name` | VARCHAR(120) | NOT NULL | Enterprise business name |
+| `address` | VARCHAR(255) | NOT NULL | Physical premises / farm address |
+| `district` | VARCHAR(80) | NOT NULL | District |
+| `state` | VARCHAR(80) | NOT NULL | State |
+| `pincode` | VARCHAR(10) | NOT NULL | Postal PIN code |
+| `contact_phone` | VARCHAR(20) | NOT NULL | Customer & supplier helpline |
+| `contact_email` | VARCHAR(100) | NOT NULL | Official billing/support email |
+| `currency_code` | VARCHAR(10) | NOT NULL, DEFAULT 'INR'| ISO 4217 Currency Code |
+| `currency_symbol` | VARCHAR(5) | NOT NULL, DEFAULT '₹' | UI symbol |
+| `bmc_capacity_litres`| DECIMAL(8,2) | NOT NULL, DEFAULT 2000.00 | Bulk Milk Cooler tank capacity |
+| `feed_base_kg` | DECIMAL(4,2) | NOT NULL, DEFAULT 1.00 | Base concentrate target |
+| `feed_rate_per_litre`| DECIMAL(4,2) | NOT NULL, DEFAULT 0.40 | Concentrate increment per L yield |
+| `feed_max_cap_kg` | DECIMAL(4,2) | NOT NULL, DEFAULT 8.00 | Maximum daily concentrate ceiling |
+| `electricity_tariff` | DECIMAL(6,2) | NOT NULL, DEFAULT 1.40 | Utility rate per kWh unit |
 | `farm_default_kwh` | DECIMAL(6,2) | NOT NULL, DEFAULT 50.00 | Default farm power units/day |
-| `production_default_kwh`| DECIMAL(6,2)| NOT NULL, DEFAULT 200.00 | Default production units/day |
+| `production_default_kwh`| DECIMAL(6,2)| NOT NULL, DEFAULT 200.00 | Default processing power units/day |
 | `mgmt_salary_to_farm_pct`| DECIMAL(5,2)| NOT NULL, DEFAULT 50.00 | % of management salary to farm |
+| `operator_name` | VARCHAR(100) | NOT NULL | Primary operator |
+| `timezone` | VARCHAR(50) | NOT NULL, DEFAULT 'Asia/Kolkata' | Farm standard timezone |
+| `updated_at` | DATETIME | ON UPDATE CURRENT_TIMESTAMP | Modification audit timestamp |
+
+### 3.2 Identity, RBAC & Authentication
+* **`users`**: UUID primary key (`id`), unique `email`, bcrypt `password_hash`, `full_name`, `phone`, `is_active`, `created_at`, `updated_at`.
+* **`roles`**: UUID primary key (`id`), unique `code` (`FARM_OWNER`, `FARM_MANAGER`, `ANIMAL_CARE`, `MILKING_STAFF`, `BMC_OPERATOR`, `PRODUCTION_OPERATOR`, `QC_STAFF`, `STOREKEEPER`, `SALES_STAFF`, `ACCOUNTANT`, `HR_ADMIN`), `name`, `description`.
+* **`permissions`**: UUID primary key (`id`), unique `code` (`module:action:scope`), `name`, `module`, `description`, `created_at`.
+* **`user_roles`**: Composite PK (`user_id`, `role_id`) referencing `users.id` and `roles.id`.
+* **`role_permissions`**: Composite PK (`role_id`, `permission_id`) referencing `roles.id` and `permissions.id`.
+* **`user_sessions`**: UUID primary key (`id`), FK `user_id`, bcrypt `refresh_token_hash`, `ip_address`, `user_agent`, `is_revoked`, `expires_at`, `created_at`, `updated_at`.
+
+### 3.3 Master Data & Lookups
+* **`units_of_measurement`**: UUID primary key (`id`), unique `code` (`LTR`, `KG`, `GM`, `UNIT`, `PKT`, `BOX`, `CAN`, `KWH`, `HR`), `name`, `dimension` (`VOLUME`, `MASS`, `COUNT`, `ENERGY`, `TIME`, `OTHER`), `conversion_factor` `DECIMAL(12,6)`, `base_unit_code`, `is_active`, `created_at`.
+* **`lookup_categories`**: UUID primary key (`id`), unique `code` (`ANIMAL_BREED`, `ANIMAL_SPECIES`, `HEALTH_DIAGNOSIS`, `FEED_TYPE`, `PAYMENT_MODE`, `QUALITY_GRADE`), `name`, `description`, `created_at`.
+* **`lookup_values`**: UUID primary key (`id`), `category_code` (FK -> `lookup_categories.code`), `code`, `label`, `sort_order`, `is_active`, `metadata` JSON, `created_at`. Unique composite constraint on (`category_code`, `code`).
+
+### 3.4 Audit Trail & Compliance
+* **`audit_logs`**: UUID primary key (`id`), FK `user_id` (`ON DELETE SET NULL`), `action` VARCHAR(50), `entity_type` VARCHAR(60), `entity_id` VARCHAR(36), `old_values` LONGTEXT JSON, `new_values` LONGTEXT JSON, `ip_address` VARCHAR(45), `user_agent` VARCHAR(255), `created_at` DATETIME. Indexes on (`entity_type`, `entity_id`), (`user_id`), and (`created_at`).
+
+---
+
+## 4. Domain Tables Summary (All 24 Modules)
+
+| Table | Business Module | Key Columns & Precision | Indices & Constraints |
+| :--- | :--- | :--- | :--- |
+| `animals` | Herd Registry & Lifecycle | `ear_tag` (UNIQUE), `breed`, `status`, `body_weight_kg` (6,2) | INDEX on `status`, `breed` |
+| `milking_logs` | Shift Milking Records | `record_date`, `session`, `yield_litres` (6,2), `disposition` | INDEX (`record_date`, `session`), FK `animal_id` |
+| `health_records` | Veterinary & Treatments | `care_type`, `medicine_vaccine`, `prescribed_dose`, `withdrawal_until` | FK `animal_id`, FK `stock_item_id` |
+| `breeding_records` | AI & Calving Lifecycle | `event_type`, `sire_semen_id`, `expected_calving_date` | FK `animal_id`, INDEX `record_date` |
+| `feed_entries` | Feed Rations & Consumption| `quantity_kg` (8,2), `feed_type` | FK `animal_id`, FK `stock_item_id` |
+| `bmc_intake_logs` | BMC Reception & QC Gate | `batch_number` (UNIQUE), `quantity_litres` (8,2), `decision` | INDEX `record_date`, `decision` |
+| `production_batches` | Dairy Processing Batches | `bmc_milk_consumed_l` (8,2), `finished_quantity` (8,2), `quality_release` | INDEX `record_date`, `product_type` |
+| `packaging_runs` | Retail Packaging | `pack_size` (6,2), `number_of_packs`, `material_consumed` (8,2) | FK `production_batch_id`, FK `packaging_item_id` |
+| `quality_records` | Quality Control Lab Logs | `fat_percentage` (4,2), `snf_percentage` (4,2), `decision` | FK `intake_id`, FK `production_batch_id` |
+| `stock_items` | Master Inventory Directory| `name` (UNIQUE), `current_stock` (10,2), `weighted_avg_price` (10,2) | INDEX `category`, `used_by` |
+| `stock_receipts` | Inbound Stock Purchases | `received_quantity` (10,2), `unit_price` (10,2), `total_amount` (10,2) | FK `stock_item_id`, INDEX `receipt_date` |
+| `stock_ledger_entries`| Double-Entry Stock Ledger| `quantity_in` (10,2), `quantity_out` (10,2), `balance_after` (10,2) | FK `stock_item_id`, INDEX (`item_id`, `date`) |
+| `material_issues` | Production Material Requisitions | `quantity_issued` (10,2), `cost_allocated` (10,2) | FK `stock_item_id`, INDEX `department` |
+| `wastage_records` | Spoilage & Write-Offs | `quantity_lost` (10,2), `estimated_loss_value` (10,2), `reason` | FK `stock_item_id`, INDEX `record_date` |
+| `customers` | Wholesale & Retail Clients | `customer_name`, `phone`, `current_balance` (10,2) | UNIQUE `customer_name`, INDEX `phone` |
+| `sales_orders` | Orders & Dispatches | `packs_sold`, `price_per_pack` (8,2), `total_amount` (10,2) | FK `packaging_run_id`, FK `customer_id` |
+| `sales_dispatches` | Delivery Dispatches | `dispatched_quantity` (10,2), `dispatch_status` | FK `order_id`, INDEX `dispatch_date` |
+| `customer_payments`| Cash/Bank Settlements | `amount_paid` (10,2), `payment_mode`, `receipt_number` | FK `customer_id`, FK `order_id` |
+| `operating_expenses`| Operational Cash Overhead| `category`, `amount` (10,2), `department` | INDEX (`record_date`, `department`) |
+| `employees` | Staff Directory & Payroll | `employee_code` (UNIQUE), `monthly_salary` (10,2), `daily_salary_rate` (8,2) | INDEX `department`, `is_active` |
+| `electricity_readings`| Meter Utility Logging | `kwh_units` (8,2), `tariff_rate` (6,2), `total_cost` (10,2) | UNIQUE (`record_date`, `department`) |
+| `biogas_runs` | Biogas Digestion & Slurry | `dung_input_kg` (8,2), `gas_output_m3` (8,2), `slurry_output_kg` (8,2) | INDEX `record_date` |
+| `regulatory_licences`| FSSAI & Environmental Compliance | `licence_number` (UNIQUE), `licence_type`, `expiry_date` | INDEX `expiry_date`, `status` |
+
+---
+
+## 5. Indexing Strategy & Query Optimization
+
+1. **Anti-N+1 Joining Strategy:**
+   * High-traffic endpoints (such as `GET /api/v1/users`, `GET /api/v1/master-data/categories`) use eager TypeORM relations or explicit QueryBuilder `leftJoinAndSelect` queries to load relations in single SQL statements with predictable joins.
+2. **Composite Uniqueness:**
+   * `lookup_values`: `UNIQUE KEY uq_lookup_cat_code (category_code, code)` ensures taxonomy integrity.
+   * `electricity_readings`: `UNIQUE KEY uq_elec_date_dept (record_date, department)` prevents duplicate daily meter submissions.
+3. **Audit Log Partitioning Strategy:**
+   * `audit_logs` maintains indices on `entity_type`, `user_id`, and `created_at` for high-throughput range scans.
+
+---
+
+## 6. Migration Governance & Database Environments
+
+| Environment | Database Name | Credentials / Connection | Sync Policy |
+| :--- | :--- | :--- | :--- |
+| **Development** | `dairy_farm_db` | `127.0.0.1:3306`, root, empty pwd | Controlled migration execution via `mysql.exe` |
+| **Integration Test** | `dairy_farm_test_db` | `127.0.0.1:3306`, root, empty pwd | Dedicated test DB, fully seeded, test suite isolated |
+| **Production** | *(Target Prod DB)* | Restricted vault credentials | Migration runner only; destructive sync strictly prohibited |

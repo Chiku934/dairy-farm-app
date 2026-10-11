@@ -1,40 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { FarmSettingsEntity } from './entities/farm-settings.entity';
 import { UpdateFarmSettingsDto } from './dto/update-settings.dto';
-
-export interface FarmSettingsEntity extends UpdateFarmSettingsDto {
-  id: number;
-  timezone: string;
-  updatedAt: string;
-}
 
 @Injectable()
 export class SettingsService {
-  // Initial default settings seeded directly from reference specification
-  private settings: FarmSettingsEntity = {
-    id: 1,
-    bmcCapacityLitres: 2000.0,
-    feedBaseKg: 1.0,
-    feedRatePerLitre: 0.4,
-    feedMaxCapKg: 8.0,
-    electricityTariff: 1.4,
-    farmDefaultKwh: 50.0,
-    productionDefaultKwh: 200.0,
-    mgmtSalaryToFarmPct: 50.0,
-    operatorName: 'Kaivalya team',
-    timezone: 'Asia/Kolkata',
-    updatedAt: new Date().toISOString(),
-  };
+  constructor(
+    @InjectRepository(FarmSettingsEntity)
+    private readonly settingsRepo: Repository<FarmSettingsEntity>,
+  ) {}
 
-  getSettings(): FarmSettingsEntity {
-    return this.settings;
+  async getSettings(): Promise<FarmSettingsEntity> {
+    const settings = await this.settingsRepo.findOne({ where: { id: 1 } });
+    if (!settings) {
+      // Create initial record if missing
+      const initial = this.settingsRepo.create({ id: 1 });
+      return this.settingsRepo.save(initial);
+    }
+    return settings;
   }
 
-  updateSettings(dto: UpdateFarmSettingsDto): FarmSettingsEntity {
-    this.settings = {
-      ...this.settings,
-      ...dto,
-      updatedAt: new Date().toISOString(),
-    };
-    return this.settings;
+  async updateSettings(dto: UpdateFarmSettingsDto): Promise<FarmSettingsEntity> {
+    let settings = await this.settingsRepo.findOne({ where: { id: 1 } });
+    if (!settings) {
+      settings = this.settingsRepo.create({ id: 1, ...dto });
+    } else {
+      Object.assign(settings, dto);
+    }
+    return this.settingsRepo.save(settings);
   }
 }

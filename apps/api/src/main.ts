@@ -43,12 +43,23 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Dairy Farm Management System API')
     .setDescription(
-      'Comprehensive REST API specifications for farm, milk processing, and business operations.',
+      'Enterprise REST API specifications for farm, milk processing, and business operations.',
     )
     .setVersion('1.0')
-    .addTag('Health & Diagnostics')
-    .addTag('Business: Farm Settings')
-    .addBearerAuth()
+    .addTag('Health & Diagnostics', 'Liveness probes and database connection verification')
+    .addTag('Authentication & Sessions', 'JWT token lifecycle, login, refresh, profile and session revocation')
+    .addTag('Farm Settings & Identity', 'Master farm identity, technical constants, and default utility rates')
+    .addTag('Users, Roles & Permissions', 'Staff accounts, role assignments, and granular RBAC controls')
+    .addTag('Master Data & Lookups', 'Standard units of measurement, taxonomy lookups, and categorizations')
+    .addTag('Audit Logs & Compliance', 'Immutable system audit trails and regulatory activity history')
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      name: 'JWT',
+      description: 'Enter JWT bearer token',
+      in: 'header',
+    })
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -1,271 +1,218 @@
 # Dairy Farm Management System - API Contracts & Specifications
 
-## 1. REST API Conventions
+## 1. REST API Architecture & Standards
 
-All API endpoints follow RESTful standards and return a consistent JSON response envelope.
+All endpoints follow RESTful standards and return a uniform JSON response envelope across every module.
 
-### 1.1 Base URL & Versioning
-```
-Base URL: /api/v1
-Authentication: Bearer <JWT_ACCESS_TOKEN>
-```
+### 1.1 Base URL & Security
+* **Base URL:** `/api/v1`
+* **Swagger OpenAPI Documentation:** `http://localhost:3000/api/docs`
+* **Authentication Header:** `Authorization: Bearer <JWT_ACCESS_TOKEN>`
 
-### 1.2 Standard Success Response Envelope
+### 1.2 Standard Success Envelope (`ResponseEnvelope<T>`)
+Every 2xx response is wrapped by `TransformInterceptor`:
 ```json
 {
   "success": true,
   "statusCode": 200,
-  "message": "Resource retrieved successfully",
+  "message": "Operation completed successfully",
   "data": {},
-  "timestamp": "2026-10-11T06:30:00.000Z"
+  "timestamp": "2026-10-11T10:30:00.000Z"
 }
 ```
 
-### 1.3 Standard Error Response Envelope
+### 1.3 Standard Error Envelope (`ApiErrorResponse`)
+All exceptions are formatted uniformly by `AllExceptionsFilter`:
 ```json
 {
   "success": false,
   "statusCode": 400,
   "error": "Bad Request",
   "message": [
-    "yieldLitres must be greater than 0",
-    "session must be one of: MORNING, EVENING"
+    "email must be an email",
+    "password must be longer than or equal to 8 characters"
   ],
-  "path": "/api/v1/milking",
-  "timestamp": "2026-10-11T06:30:00.000Z"
+  "path": "/api/v1/users",
+  "timestamp": "2026-10-11T10:30:00.000Z"
 }
 ```
 
 ---
 
-## 2. Core Endpoint Specifications
+## 2. Standard Pagination, Sorting & Filtering Contracts
 
-### 2.1 Authentication & Authorization
-* **`POST /api/v1/auth/login`**
-  * *Request Body:* `{ "email": "admin@dairy.com", "password": "SecurePassword123" }`
-  * *Response Data:* `{ "accessToken": "eyJ...", "refreshToken": "eyJ...", "user": { "id": "uuid", "fullName": "Admin User", "roles": ["FARM_OWNER"] } }`
-* **`POST /api/v1/auth/refresh`**
-  * *Request Body:* `{ "refreshToken": "eyJ..." }`
-  * *Response Data:* `{ "accessToken": "eyJ..." }`
-* **`GET /api/v1/auth/me`**
-  * *Response Data:* Current user profile and role permissions list.
+All list endpoints extend `PaginationQueryDto` and return `PaginatedResult<T>`:
 
----
+### 2.1 Query Parameters
+| Parameter | Type | Default | Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `page` | integer | `1` | Min: 1 | 1-indexed page number |
+| `limit` | integer | `20` | Min: 1, Max: 100 | Items per page |
+| `sortBy` | string | `'createdAt'` | Optional | Column field name to order by |
+| `sortOrder`| enum | `'DESC'` | `'ASC'` or `'DESC'` | Sort direction |
+| `search` | string | `null` | Optional | Free-text keyword search across indexed text fields |
 
-### 2.2 Domain A: Your Dairy
-
-#### Overview Dashboard
-* **`GET /api/v1/dashboard/overview?period=daily&date=2026-10-05`**
-  * *Response Data:*
-    ```json
-    {
-      "period": "2026-10-05",
-      "comparisonPeriod": "2026-10-04",
-      "kpis": {
-        "milkRecordedLitres": 25.0,
-        "salesRevenue": 1500.00,
-        "operatingCost": 1616.67,
-        "dryFertiliserOutputKg": 0.0
-      },
-      "operatingValues": {
-        "farmCost": 1336.67,
-        "productionAndBiogasCost": 280.00,
-        "acceptedBmcIntakeLitres": 25.0,
-        "currentBmcBalanceLitres": 5.0,
-        "openSalesOrders": 0
-      },
-      "alerts": [
-        { "id": "ALT-1", "type": "LOW_FEED", "message": "Reorder Feed: Maize has 0 kg remaining" }
-      ]
-    }
-    ```
-
-#### Herd & Calves
-* **`GET /api/v1/herd?status=LACTATING&search=Ganga`**
-* **`POST /api/v1/herd`**
-  * *Request Body:*
-    ```json
-    {
-      "earTag": "210385",
-      "name": "Ganga",
-      "breed": "HF",
-      "sex": "FEMALE",
-      "dateOfBirth": "2022-03-15",
-      "status": "LACTATING",
-      "bodyWeightKg": 420.5,
-      "damTag": "12001",
-      "lastCalvingDate": "2026-08-10",
-      "bodyConditionScore": 3.5,
-      "notes": "High yield prime producer"
-    }
-    ```
-
-#### Milking Log
-* **`POST /api/v1/milking`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-05",
-      "animalTag": "210385",
-      "session": "MORNING",
-      "yieldLitres": 15.0,
-      "disposition": "ELIGIBLE",
-      "notes": "Good flow"
-    }
-    ```
-  * *Server Validation:* If cow has active milk withdrawal date $> 2026-10-05$, server rejects `ELIGIBLE` and returns `400 Bad Request: Milk cannot be eligible for collection during active withdrawal period`.
-
-#### Feed Planning & Entries
-* **`GET /api/v1/feed/target?animalTag=210385`**
-  * *Response Data:* `{ "animalTag": "210385", "averageYield7Days": 25.0, "targetConcentrateKg": 8.0, "rule": "1 kg base + 0.4 kg/L (max 8 kg)" }`
-* **`POST /api/v1/feed`**
-  * *Request Body:* `{ "recordDate": "2026-10-05", "animalTag": "210385", "stockItemId": "feed-item-uuid", "quantityKg": 7.5, "feedType": "CONCENTRATE" }`
-
-#### Daily Farm Costing
-* **`GET /api/v1/costing/daily-milk?date=2026-10-05`**
-  * *Response Data:*
-    ```json
-    {
-      "date": "2026-10-05",
-      "isComplete": true,
-      "eligibleMilkLitres": 25.0,
-      "breakdown": {
-        "feedConsumed": 0.00,
-        "medicinesUsed": 0.00,
-        "otherMaterials": 0.00,
-        "farmSalariesDaily": 1266.67,
-        "farmElectricity": 70.00,
-        "otherFarmExpenses": 0.00
-      },
-      "totalDailyFarmCost": 1336.67,
-      "costPerLitre": 53.47
-    }
-    ```
+### 2.2 Paginated Data Envelope (`PaginatedResult<T>`)
+Inside the `data` property:
+```json
+{
+  "items": [],
+  "total": 142,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 8
+}
+```
 
 ---
 
-### 2.3 Domain B: Milk to Market
+## 3. Foundation Endpoint Specifications
 
-#### BMC & Milk Intake
-* **`POST /api/v1/bmc/intake`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-05",
-      "source": "FARM",
-      "supplierRoute": "Main Paddock",
-      "quantityLitres": 25.0,
-      "externalTotalCost": 0.0,
-      "decision": "ACCEPTED",
-      "temperatureC": 4.2,
-      "fatPercentage": 4.1,
-      "snfPercentage": 8.6,
-      "clr": 29.5,
-      "ph": 6.7,
-      "notes": "Farm morning intake"
-    }
-    ```
-* **`GET /api/v1/bmc/balance`**
-  * *Response Data:* `{ "tankCapacityLitres": 2000.0, "availableBmcLitres": 5.0, "totalAcceptedLitres": 5.0, "totalRejectedLitres": 1000.0 }`
+### 3.1 Authentication & Sessions (`/api/v1/auth`)
 
-#### Production Batches
-* **`POST /api/v1/production/batches`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-05",
-      "productType": "PANEER",
-      "bmcMilkConsumedL": 50.0,
-      "finishedQuantity": 9.2,
-      "unitOfMeasure": "KG",
-      "lpgStockItemId": "lpg-uuid",
-      "lpgUsedKg": 1.5,
-      "byproductQuantityKg": 40.0,
-      "processRecord": "Heated to 85C, coagulated with citric acid",
-      "expiryDate": "2026-10-12",
-      "qualityRelease": "HOLD"
-    }
-    ```
+#### `POST /api/v1/auth/login` (Public)
+Authenticates a user and issues a short-lived access JWT and a long-lived rotating refresh token.
+* **Request Body:**
+```json
+{
+  "email": "admin@dairyfarm.local",
+  "password": "Password@123"
+}
+```
+* **Success Response (200):**
+```json
+{
+  "accessToken": "eyJhbGciOi...",
+  "refreshToken": "7c8e9b60-49...",
+  "tokenType": "Bearer",
+  "expiresInSeconds": 3600,
+  "user": {
+    "id": "usr-dev-admin",
+    "email": "admin@dairyfarm.local",
+    "fullName": "Arjun Patel",
+    "roles": ["FARM_OWNER"],
+    "permissions": ["farm:settings:read", "farm:settings:write", "..."]
+  }
+}
+```
 
-#### Packaging Runs
-* **`POST /api/v1/packaging/runs`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-05",
-      "productionBatchId": "batch-uuid",
-      "packSize": 0.25,
-      "packUnit": "KG",
-      "numberOfPacks": 36,
-      "packagingItemId": "pouch-uuid",
-      "materialConsumed": 36.0
-    }
-    ```
+#### `POST /api/v1/auth/refresh` (Public)
+Rotates the refresh token and issues a new access token atomically inside a database transaction.
+* **Request Body:**
+```json
+{
+  "refreshToken": "7c8e9b60-49..."
+}
+```
 
-#### Sales & Payments
-* **`POST /api/v1/sales`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-05",
-      "packagingRunId": "pkg-uuid",
-      "packsSold": 20,
-      "customerName": "Dandiri General Store",
-      "pricePerPack": 75.00,
-      "amountReceived": 1000.00,
-      "orderReference": null
-    }
-    ```
-* **`POST /api/v1/payments`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-06",
-      "saleId": "sale-uuid",
-      "amountReceived": 500.00,
-      "paymentMethod": "CASH"
-    }
-    ```
+#### `GET /api/v1/auth/me` (Authenticated)
+Returns identity, assigned roles, and aggregated permissions of the currently authenticated token bearer.
+
+#### `POST /api/v1/auth/logout` (Authenticated)
+Revokes the caller's active refresh token session in `user_sessions`.
 
 ---
 
-### 2.4 Domain C: Business & Operations
+### 3.2 Farm Settings & Identity (`/api/v1/settings`)
 
-#### Common Inventory
-* **`POST /api/v1/inventory/items`**
-* **`POST /api/v1/inventory/receipts`**
-  * *Request Body:*
-    ```json
-    {
-      "recordDate": "2026-10-05",
-      "stockItemId": "item-uuid",
-      "quantity": 100.0,
-      "supplier": "Kisan Feeds",
-      "supplierLot": "LOT-8891",
-      "expiryDate": "2027-04-01",
-      "totalCost": 2200.00
-    }
-    ```
+#### `GET /api/v1/settings` (Authenticated)
+Returns enterprise profile, physical contact identity, and operational calculation constants.
+* **Response (200):**
+```json
+{
+  "id": 1,
+  "farmName": "Kaivalya Dairy Farm & Processing",
+  "address": "Dandiri, Near NH-26",
+  "district": "Koraput",
+  "state": "Odisha",
+  "pincode": "764036",
+  "contactPhone": "+91 9876543210",
+  "contactEmail": "support@kaivalyadairy.com",
+  "currencyCode": "INR",
+  "currencySymbol": "₹",
+  "bmcCapacityLitres": 2000.0,
+  "feedBaseKg": 1.0,
+  "feedRatePerLitre": 0.4,
+  "feedMaxCapKg": 8.0,
+  "electricityTariff": 1.4,
+  "farmDefaultKwh": 50.0,
+  "productionDefaultKwh": 200.0,
+  "mgmtSalaryToFarmPct": 50.0,
+  "operatorName": "Kaivalya Team",
+  "timezone": "Asia/Kolkata",
+  "updatedAt": "2026-10-11T10:14:00.000Z"
+}
+```
 
-#### Reports & Exports
-* **`GET /api/v1/reports/summary?from=2026-10-01&to=2026-10-05`**
-* **`GET /api/v1/reports/export/costs?from=2026-10-01&to=2026-10-05`** (Returns CSV)
-* **`GET /api/v1/reports/export/materials?from=2026-10-01&to=2026-10-05`** (Returns CSV)
-* **`GET /api/v1/reports/backup/json`** (Returns full JSON database dump)
+#### `PATCH /api/v1/settings` & `PUT /api/v1/settings` (Authenticated, `farm:settings:write`)
+Partially or fully updates enterprise profile, phone numbers, or operational cost multipliers.
 
-#### Farm Settings
-* **`GET /api/v1/settings`**
-* **`PUT /api/v1/settings`**
-  * *Request Body:*
-    ```json
-    {
-      "bmcCapacityLitres": 2000.0,
-      "feedBaseKg": 1.0,
-      "feedRatePerLitre": 0.4,
-      "feedMaxCapKg": 8.0,
-      "electricityTariff": 1.40,
-      "farmDefaultKwh": 50.0,
-      "productionDefaultKwh": 200.0,
-      "mgmtSalaryToFarmPct": 50.0
-    }
-    ```
+---
+
+### 3.3 Users, Roles & RBAC (`/api/v1/users`)
+
+#### `GET /api/v1/users`
+Returns paginated staff users with eager-joined roles and permissions. Supports `isActive` and `roleCode` filters.
+
+#### `POST /api/v1/users`
+Creates a staff user account inside a database transaction, hashing password with bcrypt.
+* **Request Body:**
+```json
+{
+  "email": "veterinarian.patro@dairyfarm.local",
+  "password": "SecurePassword@123",
+  "fullName": "Dr. Subrat Patro",
+  "phone": "+91 9876543220",
+  "roleIds": ["role-03"]
+}
+```
+
+#### `GET /api/v1/users/roles`
+Returns all 11 system roles with their full set of mapped granular permissions.
+
+#### `GET /api/v1/users/permissions`
+Lists all 33 granular permission capabilities grouped by module.
+
+#### `POST /api/v1/users/:id/roles`
+Atomically assigns or updates role assignments for a user.
+
+---
+
+### 3.4 Master Data & Taxonomy Lookups (`/api/v1/master-data`)
+
+#### `GET /api/v1/master-data/uoms`
+Returns units of measurement (`LTR`, `KG`, `GM`, `UNIT`, `PKT`, `BOX`, `CAN`, `KWH`, `HR`) with dimension and conversion factors.
+
+#### `POST /api/v1/master-data/uoms`
+Registers a new unit of measurement with uniqueness check on `code`.
+
+#### `GET /api/v1/master-data/categories`
+Lists all lookup categories (`ANIMAL_BREED`, `ANIMAL_SPECIES`, `HEALTH_DIAGNOSIS`, `FEED_TYPE`, `PAYMENT_MODE`, `QUALITY_GRADE`) with their active values.
+
+#### `GET /api/v1/master-data/categories/:categoryCode/values`
+Fetches sorted values for a specific category (e.g., `ANIMAL_BREED`).
+
+#### `POST /api/v1/master-data/values`
+Adds a new lookup item with optional JSON metadata and composite uniqueness validation (`category_code`, `code`).
+
+---
+
+### 3.5 Audit Logs & Compliance (`/api/v1/audit-logs`)
+
+#### `GET /api/v1/audit-logs`
+Returns paginated immutable system audit trail entries. Supports filtering by `entityType`, `action`, `userId`, and date ranges.
+* **Item Model:**
+```json
+{
+  "id": "uuid",
+  "userId": "usr-dev-admin",
+  "action": "UPDATE_SETTINGS",
+  "entityType": "FARM_SETTINGS",
+  "entityId": "1",
+  "oldValues": { "feedRatePerLitre": 0.4 },
+  "newValues": { "feedRatePerLitre": 0.42 },
+  "ipAddress": "127.0.0.1",
+  "userAgent": "Mozilla/5.0 ...",
+  "createdAt": "2026-10-11T10:20:00.000Z"
+}
+```
