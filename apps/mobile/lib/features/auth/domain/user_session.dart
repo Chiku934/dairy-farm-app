@@ -84,6 +84,19 @@ class UserSession {
     required this.user,
   });
 
+  String get id => user.id;
+  String get email => user.email;
+  String get fullName => user.fullName;
+  List<String> get roles => user.roles;
+  List<String> get permissions => user.permissions;
+  bool get isOwner => user.isOwner;
+  bool get isManager => user.isManager;
+  bool get isAccountant => user.isAccountant;
+  bool get isAuditor => user.isAuditor;
+  bool get isStorekeeper => user.isStorekeeper;
+  String get primaryRoleTitle => user.primaryRoleDisplayName;
+  bool hasPermission(String perm) => user.hasPermission(perm);
+
   factory UserSession.fromJson(Map<String, dynamic> json) {
     return UserSession(
       accessToken: json['accessToken'] as String? ?? '',

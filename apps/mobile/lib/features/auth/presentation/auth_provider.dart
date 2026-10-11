@@ -23,6 +23,8 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 // Auth State Definition
 sealed class AuthState {
   const AuthState();
+  UserSession? get session => this is Authenticated ? (this as Authenticated).session : null;
+  bool get isAuthenticated => this is Authenticated;
 }
 
 class AuthInitial extends AuthState {

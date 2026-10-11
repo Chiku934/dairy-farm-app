@@ -10,19 +10,75 @@ import 'package:dairy_mobile/core/widgets/inputs/app_number_input.dart';
 import 'package:dairy_mobile/core/widgets/states/app_state_views.dart';
 import 'package:dairy_mobile/core/widgets/tables/app_data_table.dart';
 import 'package:dairy_mobile/features/showcase/presentation/ui_showcase_screen.dart';
+import 'package:dairy_mobile/features/dashboard/presentation/dashboard_provider.dart';
+import 'package:dairy_mobile/features/dashboard/domain/dashboard_models.dart';
 
 void main() {
   testWidgets('DairyFarmMobileApp mounts and displays Overview screen', (WidgetTester tester) async {
+    final sampleDashboardData = DashboardOverviewModel(
+      periodType: 'today',
+      startDate: '2026-10-11',
+      endDate: '2026-10-11',
+      periodLabel: 'Today',
+      milkRecorded: const KpiMetricModel(
+        value: 57.5,
+        unit: 'L',
+        label: 'Milk Recorded',
+      ),
+      dryFertiliser: const KpiMetricModel(
+        value: 75.0,
+        unit: 'kg',
+        label: 'Dry Fertiliser Output',
+      ),
+      salesRevenue: const KpiMetricModel(
+        value: 2740.0,
+        currency: '₹',
+        label: 'Sales Revenue',
+      ),
+      operatingCost: const KpiMetricModel(
+        value: 1867.20,
+        currency: '₹',
+        label: 'Operating Cost',
+      ),
+      costPerLitre: const CostPerLitreModel(
+        value: 32.47,
+        currency: '₹',
+        label: 'Cost per Litre',
+        status: 'CALCULATED',
+        formulaExplanation: '₹1867.20 total cost / 57.50 L milk',
+      ),
+      herd: const HerdSummaryModel(
+        totalActive: 9,
+        lactating: 4,
+        dry: 1,
+        pregnant: 1,
+        heifersCalves: 2,
+        bulls: 1,
+      ),
+      bmcTank: const BmcStatusModel(
+        capacityLitres: 2000.0,
+        currentBalanceLitres: 105.4,
+        utilizationPercent: 5.3,
+        status: 'NORMAL',
+      ),
+      totalAlertsCount: 0,
+      alerts: const [],
+      dailyYields: const [],
+      recentActivity: const [],
+    );
+
     await tester.pumpWidget(
-      const ProviderScope(
-        child: DairyFarmMobileApp(),
+      ProviderScope(
+        overrides: [
+          dashboardOverviewProvider.overrideWith((ref) => Future.value(sampleDashboardData)),
+        ],
+        child: const DairyFarmMobileApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Overview'), findsOneWidget);
-    expect(find.text('Record milking'), findsOneWidget);
-    expect(find.text('MILK RECORDED'), findsOneWidget);
+    expect(find.text('Farm Dashboard'), findsOneWidget);
+    expect(find.text('Live Farm Records · Real-Time Mode'), findsOneWidget);
   });
 
   testWidgets('AppButton renders variants, states, and fires callbacks', (WidgetTester tester) async {

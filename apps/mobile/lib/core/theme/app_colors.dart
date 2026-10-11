@@ -89,4 +89,17 @@ class AppColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
+
+  // Convenience Aliases for Design System Compatibility
+  static const Color textPrimary = textMain;
+  static const Color neutralBorder = borderSubtle;
+  static const Color statusError = statusDanger;
+  static const Color warningBg = statusWarningSurface;
+  static const Color neutral100 = surfaceSubtle;
+  static const Color neutral500 = textMuted;
+  static const Color neutral600 = textSecondary;
+  static const Color neutral700 = textSecondary;
+  static const Color accentEmerald = emerald;
+  static const Color accentMint = mint;
+  static const Color accentTeal = Color(0xFF0D9488);
 }

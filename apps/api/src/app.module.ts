@@ -8,6 +8,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { MasterDataModule } from './modules/master-data/master-data.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AuditModule } from './modules/audit/audit.module';
     AuthModule,
     MasterDataModule,
     AuditModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

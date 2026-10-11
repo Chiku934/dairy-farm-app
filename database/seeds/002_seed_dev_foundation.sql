@@ -178,14 +178,14 @@ SELECT 'role-12', `id` FROM `permissions`
 WHERE `code` LIKE '%:read';
 
 -- 6. Development Users (Dev-Only with Bcrypt Hash for password: 'Password@123')
--- Hash: $2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO
+-- Hash: $2b$10$DUSMsCiD8nRTPegQpKXwAOR2Se3oNw6kauEddnjhpq8XZUkDZWvi6
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `phone`, `is_active`, `created_at`, `updated_at`) VALUES
-('usr-dev-admin', 'admin@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Arjun Patel', '+91 9876543210', 1, NOW(), NOW()),
-('usr-dev-manager', 'manager@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Ramesh Kumar', '+91 9876543211', 1, NOW(), NOW()),
-('usr-dev-store', 'store@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Sunil Verma', '+91 9876543212', 1, NOW(), NOW()),
-('usr-dev-accountant', 'accountant@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Pooja Sharma', '+91 9876543213', 1, NOW(), NOW()),
-('usr-dev-auditor', 'auditor@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Vikram Sen', '+91 9876543214', 1, NOW(), NOW())
-ON DUPLICATE KEY UPDATE `full_name` = VALUES(`full_name`);
+('usr-dev-admin', 'admin@dairyfarm.local', '$2b$10$DUSMsCiD8nRTPegQpKXwAOR2Se3oNw6kauEddnjhpq8XZUkDZWvi6', 'Arjun Patel', '+91 9876543210', 1, NOW(), NOW()),
+('usr-dev-manager', 'manager@dairyfarm.local', '$2b$10$DUSMsCiD8nRTPegQpKXwAOR2Se3oNw6kauEddnjhpq8XZUkDZWvi6', 'Ramesh Kumar', '+91 9876543211', 1, NOW(), NOW()),
+('usr-dev-store', 'store@dairyfarm.local', '$2b$10$DUSMsCiD8nRTPegQpKXwAOR2Se3oNw6kauEddnjhpq8XZUkDZWvi6', 'Sunil Verma', '+91 9876543212', 1, NOW(), NOW()),
+('usr-dev-accountant', 'accountant@dairyfarm.local', '$2b$10$DUSMsCiD8nRTPegQpKXwAOR2Se3oNw6kauEddnjhpq8XZUkDZWvi6', 'Pooja Sharma', '+91 9876543213', 1, NOW(), NOW()),
+('usr-dev-auditor', 'auditor@dairyfarm.local', '$2b$10$DUSMsCiD8nRTPegQpKXwAOR2Se3oNw6kauEddnjhpq8XZUkDZWvi6', 'Vikram Sen', '+91 9876543214', 1, NOW(), NOW())
+ON DUPLICATE KEY UPDATE `full_name` = VALUES(`full_name`), `password_hash` = VALUES(`password_hash`);
 
 -- Link Users to Roles
 INSERT IGNORE INTO `user_roles` (`user_id`, `role_id`) VALUES
