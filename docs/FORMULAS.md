@@ -162,3 +162,56 @@ $$\text{Production Batch} \xleftarrow{\text{production\_batch\_intakes}} \text{B
   3. Processing details: Milk Consumed (L), Finished Yield (kg/L), LPG Consumed (kg), By-products (kg), Process Operator, Batch Expiry Date.
   4. Final Quality Release Status (`HOLD`, `APPROVED`, `REJECTED`).
 
+---
+
+## 5. Packaging, Quality Records, Material Issues and Electricity Readings (`REQ-MM-10`, `REQ-MM-11`, `REQ-MM-12`, `REQ-MM-13`)
+
+### 5.1 Packaging Run Conversion & Inventory Rules
+* **Total Packaged Quantity ($Q_{\text{packaged}}$):**
+  $$Q_{\text{packaged}} = \text{number\_of\_packs} \times \text{pack\_size}$$
+* **Batch Output Consistency Constraint:**
+  $$\sum_{\text{all runs}} Q_{\text{packaged}} \le \text{production\_batches.output\_quantity}$$
+  - A production batch cannot be over-packaged beyond its verified finished output.
+  - Exceeding the remaining unpackaged quantity is rejected with HTTP `400 Bad Request` (`BATCH_QUANTITY_EXCEEDED`).
+* **Packaging Material Consumption & Scrap:**
+  $$\text{material\_consumed} = \text{number\_of\_packs} + \text{scrap\_units}$$
+  - Where $\text{scrap\_units} \ge 0$ accounts for line breakages or burst pouches.
+  - Packaging item inventory in `stock_items` is atomically decremented by $\text{material\_consumed}$.
+  - If $\text{current\_stock} < \text{material\_consumed}$, the transaction is aborted with HTTP `400 Bad Request` (`INSUFFICIENT_PACKAGING_STOCK`).
+* **Stock Ledger Tracking:**
+  - A corresponding entry is inserted into `stock_ledger_entries` with `transaction_type = 'PACKAGING_CONSUMPTION'`, `quantity_change = -material_consumed`, and `reference_id = packaging_run_id`.
+
+### 5.2 Quality Records & Parameter Boundaries
+Quality testing applies to `INTAKE`, `PRODUCTION_BATCH`, or `BMC`. All readings must fall within real physical ranges:
+* **Fat Percentage:** $0.00\% \le \text{Fat} \le 100.00\%$
+* **Solids-Not-Fat (SNF):** $0.00\% \le \text{SNF} \le 100.00\%$
+* **Corrected Lactometer Reading (CLR):** $10.0 \le \text{CLR} \le 45.0$
+* **pH / Acidity:** $0.00 \le \text{pH} \le 14.00$ (Normal fresh milk: $6.40 - 6.85$)
+* **Temperature:** $-10.0^\circ\text{C} \le \text{Temperature} \le 100.0^\circ\text{C}$
+* **Decision Gate:**
+  - Valid decisions: `'PENDING'`, `'APPROVED'`, `'REJECTED'`.
+  - Readings outside physical limits (e.g., negative fat, $\text{pH} > 14$, $\text{CLR} < 10$) are rejected with HTTP `400 Bad Request` (`IMPOSSIBLE_QUALITY_PARAMETER`).
+
+### 5.3 Material Issues & Stock Movements
+* **Cost Center Departments:** `'FARM'`, `'PRODUCTION'`, `'BIOGAS'`.
+* **Issue Quantity Guard:** $Q_{\text{issue}} > 0$.
+* **Atomic Inventory Deduction:**
+  $$\text{stock\_items.current\_stock} \gets \text{stock\_items.current\_stock} - Q_{\text{issue}}$$
+  $$\text{total\_cost} = Q_{\text{issue}} \times \text{stock\_items.weighted\_avg\_price}$$
+* **Sufficiency Constraint:** If $\text{stock\_items.current\_stock} < Q_{\text{issue}}$, transaction is rolled back with HTTP `400 Bad Request` (`INSUFFICIENT_STOCK`).
+* **Ledger Tracking:** Recorded in `stock_ledger_entries` with `transaction_type = 'ISSUE'`, `quantity_change = -Q_{\text{issue}}`, and unit cost derived from `weighted_avg_price`.
+
+### 5.4 Electricity Meter Readings & Impossible Reading Guard
+* **Department Cost Centers:** `'FARM'`, `'PRODUCTION'`, `'BIOGAS'`.
+* **Opening and Closing Meter Readings:**
+  - When opening ($\text{M}_{\text{open}}$) and closing ($\text{M}_{\text{close}}$) meter numbers are provided:
+    $$\text{units\_kwh} = \text{M}_{\text{close}} - \text{M}_{\text{open}}$$
+    - **Impossible Reading Guard:** $\text{M}_{\text{close}} \ge \text{M}_{\text{open}}$.
+    - If $\text{M}_{\text{close}} < \text{M}_{\text{open}}$, the transaction is rejected with HTTP `400 Bad Request` (`METER_ROLLBACK_IMPOSSIBLE`).
+  - When direct units are logged without opening/closing counters: $\text{units\_kwh} \ge 0$.
+* **Cost Equation:**
+  $$\text{total\_cost} = \text{units\_kwh} \times \text{tariff\_rate}$$
+  - If $\text{tariff\_rate}$ is omitted in input, the system defaults to `farm_settings.electricity_tariff` (default ₹1.40/kWh).
+* **Duplicate Prevention:**
+  - Database unique key `uk_elec_dept_date (record_date, department)` strictly prevents duplicate meter logs for the same day and department. Attempting a duplicate returns HTTP `409 Conflict`.
+

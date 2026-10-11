@@ -180,3 +180,5 @@ export class ProductionBatch {
   })
   intakeLinks: ProductionBatchIntake[];
 }
+
+export { ProductionBatch as ProductionBatchEntity };

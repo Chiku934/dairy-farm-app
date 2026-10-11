@@ -8,6 +8,10 @@ import '../features/costing/presentation/costing_screen.dart';
 import '../features/bmc/presentation/bmc_screen.dart';
 import '../features/production/presentation/production_screen.dart';
 import '../features/production/presentation/batch_detail_screen.dart';
+import '../features/packaging/presentation/packaging_screen.dart';
+import '../features/quality/presentation/quality_screen.dart';
+import '../features/materials/presentation/materials_screen.dart';
+import '../features/electricity/presentation/electricity_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -103,19 +107,19 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/packaging',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Packaging', path: '/packaging'),
+      builder: (context, state) => const PackagingScreen(),
     ),
     GoRoute(
       path: '/quality',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Quality Records', path: '/quality'),
+      builder: (context, state) => const QualityScreen(),
     ),
     GoRoute(
       path: '/materials',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Material Issues', path: '/materials'),
+      builder: (context, state) => const MaterialsScreen(),
     ),
     GoRoute(
       path: '/electricity',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Electricity Readings', path: '/electricity'),
+      builder: (context, state) => const ElectricityScreen(),
     ),
     GoRoute(
       path: '/orders',

@@ -17,6 +17,10 @@ import { FeedModule } from './modules/feed/feed.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { BmcModule } from './modules/bmc/bmc.module';
 import { ProductionModule } from './modules/production/production.module';
+import { PackagingModule } from './modules/packaging/packaging.module';
+import { QualityModule } from './modules/quality/quality.module';
+import { MaterialsModule } from './modules/materials/materials.module';
+import { ElectricityModule } from './modules/electricity/electricity.module';
 
 @Module({
   imports: [
@@ -42,6 +46,11 @@ import { ProductionModule } from './modules/production/production.module';
     CostingModule,
     BmcModule,
     ProductionModule,
+    PackagingModule,
+    QualityModule,
+    MaterialsModule,
+    ElectricityModule,
   ],
 })
 export class AppModule {}
+

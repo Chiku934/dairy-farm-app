@@ -127,3 +127,15 @@ export enum WastageReason {
   EXPIRY = 'EXPIRY',
   OTHER = 'OTHER',
 }
+
+export enum QualityTargetType {
+  INTAKE = 'INTAKE',
+  PRODUCTION_BATCH = 'PRODUCTION_BATCH',
+  BMC = 'BMC',
+}
+
+export enum QualityDecision {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
