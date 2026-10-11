@@ -111,6 +111,8 @@ class AppColors {
   static const Color success = statusSuccess;
   static const Color error = statusDanger;
   static const Color warning = statusWarning;
+  static const Color info = statusInfo;
+  static const Color border = borderSubtle;
   static const Color neutral50 = surfaceWarm;
   static const Color neutral200 = borderSubtle;
   static const Color neutral400 = textMuted;

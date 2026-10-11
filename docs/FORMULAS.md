@@ -215,3 +215,71 @@ Quality testing applies to `INTAKE`, `PRODUCTION_BATCH`, or `BMC`. All readings 
 * **Duplicate Prevention:**
   - Database unique key `uk_elec_dept_date (record_date, department)` strictly prevents duplicate meter logs for the same day and department. Attempting a duplicate returns HTTP `409 Conflict`.
 
+---
+
+## 6. Common Inventory, Orders & Dispatch, Sales and Customer Payments (`REQ-BS-17`, `REQ-MM-14`, `REQ-MM-15`, `REQ-MM-16`)
+
+### 6.1 Moving Weighted Average Cost (WAC) Inventory Valuation
+* **Inbound Stock Receipt Valuation Formula:**
+  When receiving $Q_{\text{receipt}}$ units of an inventory item at unit purchase cost $P_{\text{unit}}$:
+  $$Q_{\text{new}} = Q_{\text{current}} + Q_{\text{receipt}}$$
+  $$P_{\text{new}} = \begin{cases}
+  \dfrac{(Q_{\text{current}} \times P_{\text{current}}) + (Q_{\text{receipt}} \times P_{\text{unit}})}{Q_{\text{new}}} & \text{if } Q_{\text{new}} > 0 \\
+  P_{\text{unit}} & \text{if } Q_{\text{new}} = 0
+  \end{cases}$$
+* **Stock Ledger Tracking:**
+  - Double-entry ledger updates `stock_ledger_entries` with:
+    - `transaction_type = 'RECEIPT'`
+    - `quantity_change = +Q_{\text{receipt}}`
+    - `balance_after = Q_{\text{new}}`
+    - `unit_cost = P_{\text{unit}}`
+    - `reference_id = receipt_number`
+
+### 6.2 Low-Stock Reorder Threshold Indicator
+* **Reorder Status Condition:**
+  $$\text{Reorder Trigger} \iff \text{current\_stock} \le \text{reorder\_level}$$
+* Items with current stock at or below configured `reorder_level` display a visual warning flag and filter status `'LOW_STOCK'`.
+
+### 6.3 Sales Order Booking & Line Pricing
+* **Order Line Amount:**
+  $$\text{line\_total} = \text{quantity\_ordered} \times \text{unit\_price}$$
+* **Order Total Amount:**
+  $$\text{total\_amount} = \sum_{i=1}^M \text{line\_total}_i$$
+* **Fulfillment Status Transition State Machine:**
+  $$\text{Order Status} = \begin{cases}
+  \text{'CANCELLED'} & \text{if manually cancelled prior to dispatch} \\
+  \text{'PENDING'} & \text{if } \sum \text{quantity\_dispatched} = 0 \\
+  \text{'PARTIALLY\_FULFILLED'} & \text{if } 0 < \sum \text{quantity\_dispatched} < \sum \text{quantity\_ordered} \\
+  \text{'FULFILLED'} & \text{if } \sum \text{quantity\_dispatched} \ge \sum \text{quantity\_ordered}
+  \end{cases}$$
+
+### 6.4 Sales Dispatch & Accounts Receivable Equation
+* **Dispatch Total & Balance Due:**
+  $$\text{total\_amount} = \text{packs\_sold} \times \text{price\_per\_pack}$$
+  $$\text{balance\_due} = \text{total\_amount} - \text{amount\_received}$$
+* **Customer Accounts Receivable Ledger Update:**
+  $$\text{customer.current\_balance} \gets \text{customer.current\_balance} + \text{balance\_due}$$
+* **Immediate Settlement:**
+  - If $\text{amount\_received} > 0$ at the time of dispatch, an automatic payment receipt is generated and linked to the dispatch.
+* **Immutability of Posted Dispatches:**
+  - Posted dispatches are final ledger records. Unauthorized alterations or deletions are barred to preserve fiscal integrity. Any discrepancy must be resolved through explicit returns or payment adjustments.
+
+### 6.5 Customer Payment Settlement & Allocation
+* **Payment Credit Equation:**
+  When a payment of amount $A > 0$ is posted for a customer:
+  $$\text{customer.current\_balance} \gets \text{customer.current\_balance} - A$$
+* **Dispatch-Specific Settlement:**
+  If the payment references a specific `dispatch_id`:
+  $$\text{dispatch.balance\_due} \gets \max(0, \text{dispatch.balance\_due} - A)$$
+* **Non-Negative Payment Guard:** $A > 0$. Zero, negative, or invalid amounts are rejected with HTTP `400 Bad Request`.
+
+### 6.6 Negative Stock Rejection & Concurrency Controls
+* **Strict Non-Negative Inventory Invariant:**
+  $$\text{current\_stock} \ge Q_{\text{deduction}}$$
+  Attempts to issue, consume, or dispatch quantities exceeding on-hand stock are rejected immediately with HTTP `400 Bad Request` (`INSUFFICIENT_STOCK`).
+* **Concurrency Row Locking:**
+  Inventory transactions execute inside database transactions (`isolation: READ COMMITTED` or row locks) to guarantee that concurrent requests cannot over-allocate or corrupt stock balances.
+* **Idempotency Protection:**
+  Unique constraints on `receipt_number`, `order_number`, `dispatch_number`, and `payment_number` prevent accidental duplicate form submissions.
+
+

@@ -21,6 +21,8 @@ import { PackagingModule } from './modules/packaging/packaging.module';
 import { QualityModule } from './modules/quality/quality.module';
 import { MaterialsModule } from './modules/materials/materials.module';
 import { ElectricityModule } from './modules/electricity/electricity.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { SalesModule } from './modules/sales/sales.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { ElectricityModule } from './modules/electricity/electricity.module';
     QualityModule,
     MaterialsModule,
     ElectricityModule,
+    InventoryModule,
+    SalesModule,
   ],
 })
 export class AppModule {}

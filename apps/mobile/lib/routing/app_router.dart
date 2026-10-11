@@ -12,6 +12,8 @@ import '../features/packaging/presentation/packaging_screen.dart';
 import '../features/quality/presentation/quality_screen.dart';
 import '../features/materials/presentation/materials_screen.dart';
 import '../features/electricity/presentation/electricity_screen.dart';
+import '../features/inventory/presentation/inventory_screen.dart';
+import '../features/sales/presentation/sales_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -123,19 +125,19 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/orders',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Orders & Dispatch', path: '/orders'),
+      builder: (context, state) => const SalesScreen(initialTab: 0),
     ),
     GoRoute(
       path: '/sales',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Sales', path: '/sales'),
+      builder: (context, state) => const SalesScreen(initialTab: 1),
     ),
     GoRoute(
       path: '/payments',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Customer Payments', path: '/payments'),
+      builder: (context, state) => const SalesScreen(initialTab: 2),
     ),
     GoRoute(
       path: '/inventory',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Common Inventory', path: '/inventory'),
+      builder: (context, state) => const InventoryScreen(),
     ),
     GoRoute(
       path: '/biogas',

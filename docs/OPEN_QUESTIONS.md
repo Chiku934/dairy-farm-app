@@ -51,3 +51,34 @@
 * **Context:** FSSAI statutory minimums require Cow milk Fat $\ge 3.2\%$ and $\text{SNF} \ge 8.3\%$.
 * **Unresolved Rule:** If an incoming milk batch fails these parameters, can a privileged role (e.g. `FARM_MANAGER` or `FARM_OWNER`) manually override and accept the milk at a discounted rate, or is it a hard system block?
 * **Current Action:** System records `decision: REJECTED` with organoleptic notes and permits manual manager approval override with full audit trail entry.
+
+---
+
+## 4. Orders, Dispatches, Sales Returns & Payment Allocation (Phase 10)
+
+### 4.1 Customer Sales Returns & Restocking Disposition
+* **Context:** A customer returns dispatched dairy products (e.g., delivered milk curdled during transit or customer over-ordered).
+* **Unresolved Rule:** Can returned dairy goods ever be returned to active finished inventory, or must they be sent to `wastage_records` with an audit reason?
+* **Open Options:**
+  - Option A: Perishable dairy items (pasteurized milk, paneer, dahi) cannot be re-sold and must be recorded as wastage; non-perishables (ghee tins, dry bio-manure bags) may be restocked upon QC inspection.
+  - Option B: All returns require credit notes and route directly to wastage.
+* **Current Action:** Re-stocking of returned perishables is prohibited; return adjustments create an audit log and credit receivable balance adjustment.
+
+### 4.2 Unallocated Customer Overpayments & Advance Float Allocation
+* **Context:** A customer deposits lump-sum payments (e.g. advance of ₹5,000) that exceed current outstanding invoices, or pays without referencing a specific dispatch.
+* **Unresolved Rule:** Should the system automatically apply FIFO cascading allocation to settle the oldest outstanding sales dispatches, or hold the amount as an unallocated customer credit balance?
+* **Open Options:**
+  - Option A: Automatic FIFO cascading allocation against unpaid dispatches ordered by `record_date ASC`.
+  - Option B: Hold unallocated payments as a customer account credit, leaving individual dispatches open unless explicitly settled by reference.
+* **Current Action:** Payments can reference a specific `dispatch_id` to reduce its `balance_due`; general payments credit `customers.current_balance` directly without mutating past dispatch line records.
+
+### 4.3 Order Partial Fulfillment Expiry & Remainder Cancellation Policy
+* **Context:** An order is placed for 100 pouches; 80 are dispatched (`PARTIALLY_FULFILLED`).
+* **Unresolved Rule:** If the remaining 20 cannot be fulfilled, does the order auto-cancel after the delivery date, or must a sales manager explicitly close/cancel the remaining balance?
+* **Current Action:** An order remains `PARTIALLY_FULFILLED` until explicitly closed or fully fulfilled; cancellation is blocked once fulfillment has commenced without supervisor sign-off.
+
+### 4.4 Emergency Negative Stock Policy
+* **Context:** High-throughput dispatch or material usage occurs before an inbound supplier delivery invoice has been keyed in by the storekeeper.
+* **Unresolved Rule:** Should negative stock ever be allowed under emergency flags, or must physical receipts always precede physical dispatches?
+* **Current Action:** Negative stock is strictly prohibited across all inventory categories. Any attempt to issue or dispatch stock beyond `current_stock` results in an HTTP `400 Bad Request` (`INSUFFICIENT_STOCK`).
+
