@@ -205,9 +205,10 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const UIShowcaseScreen(),
+      const ProviderScope(
+        child: MaterialApp(
+          home: UIShowcaseScreen(),
+        ),
       ),
     );
     await tester.pump();
@@ -224,9 +225,10 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const UIShowcaseScreen(),
+      const ProviderScope(
+        child: MaterialApp(
+          home: UIShowcaseScreen(),
+        ),
       ),
     );
     await tester.pump();

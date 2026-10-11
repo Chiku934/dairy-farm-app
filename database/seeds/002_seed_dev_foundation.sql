@@ -5,6 +5,22 @@
 -- DO NOT EXECUTE AGAINST PRODUCTION SYSTEMS.
 -- ============================================================================
 
+-- 0. Ensure 12 Standard Roles (including Read-only Auditor / Consultant)
+INSERT INTO `roles` (`id`, `code`, `name`, `description`) VALUES
+('role-01', 'FARM_OWNER', 'Farm Owner / Super Admin', 'Full unrestricted administrative access across all 24 modules'),
+('role-02', 'FARM_MANAGER', 'Farm Manager', 'Day-to-day farm management, operations, and supervisory access'),
+('role-03', 'ANIMAL_CARE', 'Herd / Animal Care Staff', 'Herd registry, milking, veterinary health, breeding, and feed planning'),
+('role-04', 'MILKING_STAFF', 'Milking Staff', 'Shift milking logs and milk yield entries'),
+('role-05', 'BMC_OPERATOR', 'Milk Intake / BMC Operator', 'Bulk Milk Cooler intake and reception testing'),
+('role-06', 'PRODUCTION_OPERATOR', 'Production / Packaging Operator', 'Production batch execution, packaging, and fuel logging'),
+('role-07', 'QC_STAFF', 'Quality Control Staff', 'Quality inspection parameters and batch release approvals'),
+('role-08', 'STOREKEEPER', 'Storekeeper / Inventory Staff', 'Common inventory stock receipts, issues, and wastage entries'),
+('role-09', 'SALES_STAFF', 'Sales / Dispatch Staff', 'Customer orders, dispatch dispatches, and sales records'),
+('role-10', 'ACCOUNTANT', 'Accountant / Finance Staff', 'Payments, operating costs, costing, and financial reports'),
+('role-11', 'HR_ADMIN', 'HR / Employee Administrator', 'Staff directory, payroll allocation, and personnel records'),
+('role-12', 'AUDITOR', 'Read-only Auditor / Consultant', 'Independent view-only inspection and compliance audit access')
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `description` = VALUES(`description`);
+
 -- 1. Standard Units of Measurement
 INSERT INTO `units_of_measurement` (`id`, `code`, `name`, `dimension`, `conversion_factor`, `base_unit_code`, `is_active`, `created_at`) VALUES
 ('uom-ltr', 'LTR', 'Litre', 'VOLUME', 1.000000, 'LTR', 1, NOW()),
@@ -68,7 +84,7 @@ INSERT INTO `permissions` (`id`, `code`, `name`, `module`, `description`, `creat
 ('perm-01', 'farm:settings:read', 'Read Farm Settings', 'FARM_SETTINGS', 'View farm identity, rates and configuration', NOW()),
 ('perm-02', 'farm:settings:write', 'Update Farm Settings', 'FARM_SETTINGS', 'Modify farm identity, rates and system flags', NOW()),
 ('perm-03', 'users:read', 'Read Users & Roles', 'USERS', 'View staff users, roles and assignment', NOW()),
-('perm-04', 'users:write', 'Manage Users & Roles', 'USERS', 'Create, update or revoke user accounts', NOW()),
+('perm-04', 'users:write', 'Manage Users & Roles', 'USERS', 'Create, update, activate or deactivate user accounts', NOW()),
 ('perm-05', 'master_data:read', 'Read Master Data', 'MASTER_DATA', 'View UOMs, lookups and reference data', NOW()),
 ('perm-06', 'master_data:write', 'Manage Master Data', 'MASTER_DATA', 'Create and edit UOMs and lookup values', NOW()),
 ('perm-07', 'audit:read', 'Read Audit Logs', 'AUDIT_LOGS', 'Access compliance and system audit trails', NOW()),
@@ -101,14 +117,14 @@ INSERT INTO `permissions` (`id`, `code`, `name`, `module`, `description`, `creat
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
 -- 5. Role Permissions Mapping
--- Super Admin (role-01) has all permissions
+-- Super Admin / Farm Owner (role-01) has all permissions
 INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT 'role-01', `id` FROM `permissions`;
 
 -- Farm Manager (role-02) has operational, animal, inventory, sales, production, quality, hr permissions
 INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT 'role-02', `id` FROM `permissions`
-WHERE `code` NOT IN ('audit:read', 'farm:settings:write');
+WHERE `code` NOT IN ('audit:read', 'farm:settings:write', 'users:write');
 
 -- Herd / Animal Care Staff (role-03)
 INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
@@ -116,24 +132,68 @@ SELECT 'role-03', `id` FROM `permissions`
 WHERE `module` IN ('ANIMALS', 'MILKING', 'FEED', 'HEALTH', 'BREEDING')
    OR `code` IN ('master_data:read');
 
--- Storekeeper (role-08)
+-- Milking Staff (role-04)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-04', `id` FROM `permissions`
+WHERE `module` IN ('MILKING') OR `code` IN ('animals:read');
+
+-- Milk Intake / BMC Operator (role-05)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-05', `id` FROM `permissions`
+WHERE `module` IN ('BMC') OR `code` IN ('quality:read', 'quality:write', 'master_data:read');
+
+-- Production / Packaging Operator (role-06)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-06', `id` FROM `permissions`
+WHERE `module` IN ('PRODUCTION') OR `code` IN ('inventory:read', 'master_data:read');
+
+-- Quality Control Staff (role-07)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-07', `id` FROM `permissions`
+WHERE `module` IN ('QUALITY') OR `code` IN ('bmc:read', 'production:read', 'master_data:read');
+
+-- Storekeeper / Inventory Staff (role-08)
 INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT 'role-08', `id` FROM `permissions`
 WHERE `module` IN ('INVENTORY') OR `code` IN ('master_data:read');
+
+-- Sales / Dispatch Staff (role-09)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-09', `id` FROM `permissions`
+WHERE `module` IN ('SALES') OR `code` IN ('inventory:read');
+
+-- Accountant / Finance Staff (role-10)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-10', `id` FROM `permissions`
+WHERE `module` IN ('FINANCE') OR `code` IN ('sales:read', 'inventory:read', 'hr:read', 'master_data:read');
+
+-- HR / Employee Administrator (role-11)
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-11', `id` FROM `permissions`
+WHERE `module` IN ('HR') OR `code` IN ('users:read');
+
+-- Read-only Auditor / Consultant (role-12) - STRICTLY READ-ONLY ACCESS ACROSS ALL DOMAINS
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT 'role-12', `id` FROM `permissions`
+WHERE `code` LIKE '%:read';
 
 -- 6. Development Users (Dev-Only with Bcrypt Hash for password: 'Password@123')
 -- Hash: $2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `phone`, `is_active`, `created_at`, `updated_at`) VALUES
 ('usr-dev-admin', 'admin@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Arjun Patel', '+91 9876543210', 1, NOW(), NOW()),
 ('usr-dev-manager', 'manager@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Ramesh Kumar', '+91 9876543211', 1, NOW(), NOW()),
-('usr-dev-store', 'store@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Sunil Verma', '+91 9876543212', 1, NOW(), NOW())
+('usr-dev-store', 'store@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Sunil Verma', '+91 9876543212', 1, NOW(), NOW()),
+('usr-dev-accountant', 'accountant@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Pooja Sharma', '+91 9876543213', 1, NOW(), NOW()),
+('usr-dev-auditor', 'auditor@dairyfarm.local', '$2b$10$wN9iL6t65d21t4qXgZ1U8eqjWzE8B5eN4Vn9L.z7i3f9I2lEgeuVO', 'Vikram Sen', '+91 9876543214', 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE `full_name` = VALUES(`full_name`);
 
 -- Link Users to Roles
 INSERT IGNORE INTO `user_roles` (`user_id`, `role_id`) VALUES
 ('usr-dev-admin', 'role-01'),
 ('usr-dev-manager', 'role-02'),
-('usr-dev-store', 'role-08');
+('usr-dev-store', 'role-08'),
+('usr-dev-accountant', 'role-10'),
+('usr-dev-auditor', 'role-12');
 
 -- 7. Update Farm Settings Identity for Dev Farm
 UPDATE `farm_settings`

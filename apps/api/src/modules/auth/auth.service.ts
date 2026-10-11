@@ -43,8 +43,14 @@ export class AuthService {
     userAgent?: string,
   ): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(dto.email, true);
-    if (!user || !user.isActive) {
+    if (!user) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException(
+        'Account has been deactivated. Please contact your farm administrator.',
+      );
     }
 
     const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
@@ -68,12 +74,16 @@ export class AuthService {
       permissions,
     };
 
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+    // Short-lived access token: 15 minutes (900 seconds)
+    const expiresInSeconds = 900;
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: `${expiresInSeconds}s`,
+    });
     const rawRefreshToken = uuidv4();
     const refreshTokenHash = await bcrypt.hash(rawRefreshToken, 10);
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days validity
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days validity for refresh token
 
     // Save session in database transaction
     await this.dataSource.transaction(async (manager) => {
@@ -93,7 +103,7 @@ export class AuthService {
       accessToken,
       refreshToken: rawRefreshToken,
       tokenType: 'Bearer',
-      expiresInSeconds: 3600,
+      expiresInSeconds,
       user: {
         id: user.id,
         email: user.email,
@@ -130,8 +140,17 @@ export class AuthService {
       }
     }
 
-    if (!matchedSession || !matchedSession.user || !matchedSession.user.isActive) {
+    if (!matchedSession || !matchedSession.user) {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (!matchedSession.user.isActive) {
+      // Deactivated user: immediately revoke the session and throw
+      matchedSession.isRevoked = true;
+      await this.sessionRepo.save(matchedSession);
+      throw new UnauthorizedException(
+        'Account has been deactivated. Please contact your farm administrator.',
+      );
     }
 
     const user = matchedSession.user;
@@ -151,14 +170,17 @@ export class AuthService {
       permissions,
     };
 
-    const newAccessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+    const expiresInSeconds = 900;
+    const newAccessToken = this.jwtService.sign(payload, {
+      expiresIn: `${expiresInSeconds}s`,
+    });
     const newRawRefreshToken = uuidv4();
     const newRefreshTokenHash = await bcrypt.hash(newRawRefreshToken, 10);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
-    // Revoke old session and issue new session atomically in transaction
+    // Rotate refresh token atomically: revoke previous, persist new
     await this.dataSource.transaction(async (manager) => {
       matchedSession!.isRevoked = true;
       await manager.save(UserSessionEntity, matchedSession!);
@@ -179,7 +201,7 @@ export class AuthService {
       accessToken: newAccessToken,
       refreshToken: newRawRefreshToken,
       tokenType: 'Bearer',
-      expiresInSeconds: 3600,
+      expiresInSeconds,
       user: {
         id: user.id,
         email: user.email,
@@ -207,9 +229,12 @@ export class AuthService {
         }
       }
     } else {
-      // Revoke all sessions for this user
       await this.sessionRepo.update({ userId, isRevoked: false }, { isRevoked: true });
     }
     return { success: true };
+  }
+
+  async revokeAllUserSessions(userId: string): Promise<void> {
+    await this.sessionRepo.update({ userId, isRevoked: false }, { isRevoked: true });
   }
 }

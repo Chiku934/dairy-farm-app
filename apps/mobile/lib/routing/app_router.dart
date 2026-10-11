@@ -4,6 +4,7 @@ import '../features/dashboard/presentation/overview_screen.dart';
 import '../features/herd/presentation/herd_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
+import '../features/auth/presentation/login_screen.dart';
 import '../core/widgets/app_drawer.dart';
 
 class ModulePlaceholderScreen extends StatelessWidget {
@@ -46,6 +47,10 @@ class ModulePlaceholderScreen extends StatelessWidget {
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
   routes: [
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
     GoRoute(
       path: '/',
       builder: (context, state) => const OverviewScreen(),

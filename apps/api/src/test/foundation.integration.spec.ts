@@ -232,10 +232,11 @@ describe('Foundation Integration Tests (Dedicated Test Database)', () => {
       const result = await usersService.findAll({
         page: 1,
         limit: 10,
+        search: 'admin@dairyfarm.local',
       });
 
       expect(result.items.length).toBeGreaterThan(0);
-      const admin = result.items.find((u) => u.email === 'admin@dairyfarm.local');
+      const admin = result.items[0];
       expect(admin).toBeDefined();
       expect(admin?.roles).toBeDefined();
       expect(Array.isArray(admin?.roles)).toBe(true);

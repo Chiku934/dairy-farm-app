@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
@@ -10,12 +11,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserEntity } from './entities/user.entity';
 import { RoleEntity } from './entities/role.entity';
 import { PermissionEntity } from './entities/permission.entity';
+import { UserSessionEntity } from '../auth/entities/user-session.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 import { UserQueryDto } from './dto/user-query.dto';
 import { paginateQuery } from '../../common/pagination/paginate.util';
 import { PaginatedResult } from '../../common/pagination/pagination.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class UsersService {
@@ -26,6 +29,7 @@ export class UsersService {
     private readonly roleRepo: Repository<RoleEntity>,
     @InjectRepository(PermissionEntity)
     private readonly permissionRepo: Repository<PermissionEntity>,
+    private readonly auditService: AuditService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -86,14 +90,14 @@ export class UsersService {
     return qb.getOne();
   }
 
-  async createUser(dto: CreateUserDto): Promise<UserEntity> {
+  async createUser(dto: CreateUserDto, actorUserId?: string): Promise<UserEntity> {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException(`User with email ${dto.email} already exists`);
     }
 
     // Execute in a database transaction
-    return this.dataSource.transaction(async (manager) => {
+    const newUser = await this.dataSource.transaction(async (manager) => {
       const passwordHash = await bcrypt.hash(dto.password, 10);
       const userId = uuidv4();
 
@@ -116,10 +120,31 @@ export class UsersService {
 
       return manager.save(UserEntity, user);
     });
+
+    // Audit log administrative creation
+    await this.auditService.logAction({
+      userId: actorUserId,
+      action: 'USER_CREATED',
+      entityType: 'USERS',
+      entityId: newUser.id,
+      newValues: {
+        email: newUser.email,
+        fullName: newUser.fullName,
+        roles: (newUser.roles || []).map((r) => r.code),
+      },
+    });
+
+    return newUser;
   }
 
-  async updateUser(id: string, dto: UpdateUserDto): Promise<UserEntity> {
+  async updateUser(id: string, dto: UpdateUserDto, actorUserId?: string): Promise<UserEntity> {
     const user = await this.findById(id);
+    const oldValues = {
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      isActive: user.isActive,
+    };
 
     if (dto.email && dto.email !== user.email) {
       const existing = await this.userRepo.findOne({ where: { email: dto.email } });
@@ -137,10 +162,26 @@ export class UsersService {
       user.passwordHash = await bcrypt.hash(dto.password, 10);
     }
 
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+
+    await this.auditService.logAction({
+      userId: actorUserId,
+      action: 'USER_UPDATED',
+      entityType: 'USERS',
+      entityId: id,
+      oldValues,
+      newValues: {
+        email: saved.email,
+        fullName: saved.fullName,
+        phone: saved.phone,
+        isActive: saved.isActive,
+      },
+    });
+
+    return saved;
   }
 
-  async assignRoles(id: string, dto: AssignRolesDto): Promise<UserEntity> {
+  async updateStatus(id: string, isActive: boolean, actorUserId?: string): Promise<UserEntity> {
     return this.dataSource.transaction(async (manager) => {
       const user = await manager.findOne(UserEntity, {
         where: { id },
@@ -150,6 +191,48 @@ export class UsersService {
         throw new NotFoundException(`User with ID ${id} not found`);
       }
 
+      const oldStatus = user.isActive;
+      user.isActive = isActive;
+      await manager.save(UserEntity, user);
+
+      // If deactivated, immediately revoke all active refresh tokens for this user
+      if (!isActive) {
+        await manager.update(
+          UserSessionEntity,
+          { userId: id, isRevoked: false },
+          { isRevoked: true },
+        );
+      }
+
+      await this.auditService.logAction({
+        userId: actorUserId,
+        action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+        entityType: 'USERS',
+        entityId: id,
+        oldValues: { isActive: oldStatus },
+        newValues: { isActive },
+      });
+
+      return user;
+    });
+  }
+
+  async assignRoles(
+    id: string,
+    dto: AssignRolesDto,
+    actorUserId?: string,
+  ): Promise<UserEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.findOne(UserEntity, {
+        where: { id },
+        relations: ['roles'],
+      });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+
+      const oldRoles = (user.roles || []).map((r) => r.code);
+
       const roles = await manager.find(RoleEntity, {
         where: { id: In(dto.roleIds) },
       });
@@ -157,10 +240,23 @@ export class UsersService {
       user.roles = roles;
       await manager.save(UserEntity, user);
 
-      return manager.findOneOrFail(UserEntity, {
+      const updatedUser = await manager.findOneOrFail(UserEntity, {
         where: { id },
         relations: ['roles', 'roles.permissions'],
       });
+
+      const newRoles = (updatedUser.roles || []).map((r) => r.code);
+
+      await this.auditService.logAction({
+        userId: actorUserId,
+        action: 'USER_ROLES_ASSIGNED',
+        entityType: 'USERS',
+        entityId: id,
+        oldValues: { roles: oldRoles },
+        newValues: { roles: newRoles },
+      });
+
+      return updatedUser;
     });
   }
 

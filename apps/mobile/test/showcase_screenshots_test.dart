@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dairy_mobile/core/theme/app_theme.dart';
 import 'package:dairy_mobile/features/showcase/presentation/ui_showcase_screen.dart';
 
@@ -10,10 +11,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: const UIShowcaseScreen(),
+      const ProviderScope(
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: UIShowcaseScreen(),
+        ),
       ),
     );
     await tester.pump();
@@ -31,10 +33,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: const UIShowcaseScreen(),
+      const ProviderScope(
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: UIShowcaseScreen(),
+        ),
       ),
     );
     await tester.pump();
