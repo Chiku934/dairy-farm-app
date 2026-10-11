@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.packages
+
+# Environment & Secrets (NEVER COMMIT)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.key
+*.pem
+*.jks
+key.properties
+
+# NestJS / TypeScript Builds
+dist/
+coverage/
+*.tsbuildinfo
+
+# Flutter / Dart Builds
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+build/
+*.apk
+*.aab
+*.app
+*.ipa
+
+# Logs & Diagnostics
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Databases & Local Dumps
+*.sqlite
+*.sqlite3
+*.db
+local_data/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Media & Videos
+*.mp4
+*.mov
+

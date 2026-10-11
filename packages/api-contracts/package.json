@@ -1,0 +1,14 @@
+{
+  "name": "@dairy-farm/api-contracts",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types, enums, and API contracts for Dairy Farm Management System",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
