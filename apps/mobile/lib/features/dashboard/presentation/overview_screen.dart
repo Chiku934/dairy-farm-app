@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/kpi_card.dart';
@@ -12,6 +13,11 @@ class OverviewScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Overview'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.palette_outlined),
+            tooltip: 'Design System Showcase',
+            onPressed: () => context.go('/ui-showcase'),
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_none),
             onPressed: () {},

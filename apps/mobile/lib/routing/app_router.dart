@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../features/dashboard/presentation/overview_screen.dart';
 import '../features/herd/presentation/herd_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../core/widgets/app_drawer.dart';
 
 class ModulePlaceholderScreen extends StatelessWidget {
@@ -140,6 +141,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/ui-showcase',
+      builder: (context, state) => const UIShowcaseScreen(),
     ),
   ],
 );
