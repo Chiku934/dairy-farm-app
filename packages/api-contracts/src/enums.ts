@@ -213,4 +213,34 @@ export enum CostCentre {
   BIOGAS = 'BIOGAS',
 }
 
+export enum EmploymentStatus {
+  ACTIVE = 'ACTIVE',
+  ON_LEAVE = 'ON_LEAVE',
+  TERMINATED = 'TERMINATED',
+  RESIGNED = 'RESIGNED',
+}
+
+export enum LicenceType {
+  FSSAI = 'FSSAI',
+  POLLUTION_CONTROL = 'POLLUTION_CONTROL',
+  TRADE_LICENSE = 'TRADE_LICENSE',
+  FIRE_SAFETY = 'FIRE_SAFETY',
+  GROUNDWATER = 'GROUNDWATER',
+  DAIRY_REGISTRATION = 'DAIRY_REGISTRATION',
+  OTHER = 'OTHER',
+}
+
+export enum LicenceStatus {
+  ACTIVE = 'ACTIVE',
+  EXPIRING_SOON = 'EXPIRING_SOON',
+  EXPIRED = 'EXPIRED',
+  SUSPENDED = 'SUSPENDED',
+}
+
+export enum ReminderStatus {
+  PENDING = 'PENDING',
+  NOTIFIED = 'NOTIFIED',
+  DISMISSED = 'DISMISSED',
+}
+
 

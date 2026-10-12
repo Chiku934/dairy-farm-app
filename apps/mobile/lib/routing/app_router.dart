@@ -17,6 +17,8 @@ import '../features/sales/presentation/sales_screen.dart';
 import '../features/biogas/presentation/biogas_screen.dart';
 import '../features/wastage/presentation/wastage_screen.dart';
 import '../features/expenses/presentation/expenses_screen.dart';
+import '../features/employees/presentation/employees_screen.dart';
+import '../features/licences/presentation/licences_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -156,11 +158,11 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/employees',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Employees', path: '/employees'),
+      builder: (context, state) => const EmployeesScreen(),
     ),
     GoRoute(
       path: '/licences',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'FSSAI & Licences', path: '/licences'),
+      builder: (context, state) => const LicencesScreen(),
     ),
     GoRoute(
       path: '/reports',

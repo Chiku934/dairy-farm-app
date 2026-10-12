@@ -110,4 +110,33 @@
   - Option B: Distinct operational meter log vs. financial expense ledger; finance records actual utility invoices in `operating_expenses` for cash-flow accounting.
 * **Current Action:** Meter logs and expense entries remain distinct; electricity bills are entered under `operating_expenses` (`category = 'ELECTRICITY'`) upon actual payment settlement.
 
+---
+
+## 6. Employees, Payroll, Statutory Filings & Licence Renewals (Phase 12)
+
+### 6.1 Payroll & Statutory Deductions (EPF, ESI, Professional Tax, TDS)
+* **Context:** Dairy farms in Odisha employ both regular salaried operational staff and seasonal casual milkers/fodder cutters. Indian labor codes require Employees' Provident Fund (EPF), Employees' State Insurance (ESI), Professional Tax, and Income Tax TDS under certain headcount and wage thresholds.
+* **Unresolved Rule:** Should automated monthly payroll computation, attendance-based salary slips, and statutory deduction schedules be calculated by the app, or should employee records be restricted to HR profiles and monthly salary rates?
+* **Open Options:**
+  - Option A: Implement full payroll calculation engine with PF/ESI contribution schedules, payslip PDF generation, and deduction ledgers.
+  - Option B: Keep Phase 12 strictly scoped to employee identity, department allocation, and approved base salary profile; defer automated payroll and statutory filing until formal business approval.
+* **Current Action:** Option B is enforced. No payroll generation or statutory filing services are implemented; salary fields serve strictly as reference profile data with strict RBAC privacy protection.
+
+### 6.2 External Licence Renewal Portal Integration
+* **Context:** Dairy commercial operations require FSSAI food safety licenses, State Pollution Control Board (SPCB) consent-to-operate, fire safety NOC, and local gram panchayat trade licenses.
+* **Unresolved Rule:** Should the application interface directly with government single-window portals (e.g. FoSCoS for FSSAI) to fetch live licence status or initiate renewal applications?
+* **Open Options:**
+  - Option A: Build custom API connectors or webhooks to government compliance portals.
+  - Option B: Maintain an internal compliance tracking register with document URL attachments, expiry reminders, and manual administrative updates upon renewal receipt.
+* **Current Action:** Option B is enforced. No external automated renewal or governmental portal integrations are implemented; licence records remain internal compliance registers with explicitly configured local reminder triggers.
+
+### 6.3 Contractor / Daily Wage Casual Labor Billing
+* **Context:** Seasonal farm tasks (e.g., harvesting fodder grass or repairing cow sheds) occasionally rely on third-party daily contractors rather than permanent staff on payroll.
+* **Unresolved Rule:** Should casual labor be registered as temporary employees in `employees`, or should casual wage disbursements be booked directly under `operating_expenses` (`category = 'LABOUR'`) without creating employee master records?
+* **Open Options:**
+  - Option A: Create short-term `employees` records with daily wage rates.
+  - Option B: Book ad-hoc casual labor directly in `operating_expenses` under `LABOUR`, reserving `employees` for contracted personnel.
+* **Current Action:** Permanent/contract personnel are registered in `employees`; informal ad-hoc labor payouts are recorded directly in `operating_expenses` under `LABOUR`.
+
+
 

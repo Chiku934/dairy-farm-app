@@ -26,6 +26,8 @@ import { SalesModule } from './modules/sales/sales.module';
 import { BiogasModule } from './modules/biogas/biogas.module';
 import { WastageModule } from './modules/wastage/wastage.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
+import { EmployeesModule } from './modules/employees/employees.module';
+import { LicencesModule } from './modules/licences/licences.module';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { ExpensesModule } from './modules/expenses/expenses.module';
     BiogasModule,
     WastageModule,
     ExpensesModule,
+    EmployeesModule,
+    LicencesModule,
   ],
 })
 export class AppModule {}

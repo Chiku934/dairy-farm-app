@@ -336,5 +336,45 @@ Quality testing applies to `INTAKE`, `PRODUCTION_BATCH`, or `BMC`. All readings 
 * **Duplicate Invoice Protection:**
   Duplicate submissions of identical vendor invoices (`invoice_number` for the same payee and cost centre) or repeated `expense_number` generate HTTP `409 Conflict`.
 
+---
+
+## 8. Employees, Salary Rate Computation & Regulatory Licences (Phase 12)
+
+### 8.1 Employee Profile & Daily Salary Rate Calculation
+* **Daily Salary Rate Derivation:**
+  For permanent monthly-salaried employees, the daily equivalent wage rate is derived uniformly assuming standard 30-day operational accounting:
+  $$\text{daily\_salary\_rate} = \frac{\text{monthly\_salary}}{30.00}$$
+  Stored as a generated/computed decimal value with precision 8, scale 2.
+* **Date Integrity Constraints:**
+  - `joining_date` must be a valid date formatted as `YYYY-MM-DD` and cannot be in the future:
+    $$\text{joining\_date} \le D_{\text{today}}$$
+  - If `leaving_date` is present, it must be on or after `joining_date`:
+    $$\text{leaving\_date} \ge \text{joining\_date}$$
+  - `employee_code` must be unique and non-empty (e.g. `EMP-1001`).
+
+### 8.2 Salary Privacy & RBAC Protection
+* **Salary Visibility Boundary:**
+  - **Full Access:** Calling roles with `FARM_OWNER`, `HR_ADMIN`, or `ACCOUNTANT` receive the full unredacted employee record including `monthly_salary` and `daily_salary_rate`.
+  - **Redacted Access:** Calling roles with general operational permissions (e.g. `FARM_MANAGER`, `AUDITOR`) receive staff directory, contact, department, and employment status details with `monthly_salary` and `daily_salary_rate` strictly redacted (`null` / omitted).
+  - **Audit Log Sanitization:** Audit trail entries generated on employee creation or salary updates must never log unmasked salary amounts; audit `new_values` and `old_values` record `"[REDACTED]"` for all financial fields.
+
+### 8.3 Regulatory Licence Expiry Status & Configured Reminders
+* **Validity Date Guard:**
+  Licence issue and expiration dates must satisfy strict chronological order:
+  $$\text{expiry\_date} > \text{issue\_date}$$
+  Invalid or inverted dates are rejected with HTTP `400 Bad Request`.
+* **Licence Status State Machine:**
+  Given the current calendar date $D_{\text{today}}$ and reminder lead window $R$ (`reminder_days_before`, default 30 days):
+  $$\text{status} = \begin{cases}
+  \text{'EXPIRED'} & \text{if } \text{expiry\_date} < D_{\text{today}} \\
+  \text{'EXPIRING\_SOON'} & \text{if } D_{\text{today}} \le \text{expiry\_date} \le D_{\text{today}} + R \\
+  \text{'ACTIVE'} & \text{if } \text{expiry\_date} > D_{\text{today}} + R
+  \end{cases}$$
+* **Explicitly Configured Reminder Dispatch:**
+  - Automated or on-demand reminder dispatches trigger **only** when an explicit notification service is active (`notification_service_configured = true`).
+  - When triggered, pending licences with $\text{status} \in \{\text{'EXPIRING\_SOON'}, \text{'EXPIRED'}\}$ transition $\text{reminder\_status} \gets \text{'NOTIFIED'}$ with timestamp $\text{reminder\_sent\_at} \gets \text{NOW()}$.
+  - When notification service is unconfigured, reminder status remains `'PENDING'` without attempting external dispatches.
+
+
 
 
