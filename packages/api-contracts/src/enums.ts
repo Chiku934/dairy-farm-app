@@ -181,3 +181,36 @@ export enum StockTransactionType {
   ADJUSTMENT = 'ADJUSTMENT',
 }
 
+export enum StockType {
+  BMC = 'BMC',
+  BULK_PRODUCT = 'BULK_PRODUCT',
+  PACKAGED_PRODUCT = 'PACKAGED_PRODUCT',
+  SUPPLY = 'SUPPLY',
+}
+
+export enum BiogasUsageType {
+  STORE_STOCK = 'STORE_STOCK',
+  FARM_INTERNAL = 'FARM_INTERNAL',
+  DIRECT_SALE = 'DIRECT_SALE',
+}
+
+export enum ExpenseCategory {
+  ELECTRICITY = 'ELECTRICITY',
+  VET = 'VET',
+  TRANSPORT = 'TRANSPORT',
+  MAINTENANCE = 'MAINTENANCE',
+  COLD_ROOM = 'COLD_ROOM',
+  CLEANING = 'CLEANING',
+  LABOUR = 'LABOUR',
+  FEED_SUPPLEMENT = 'FEED_SUPPLEMENT',
+  FUEL = 'FUEL',
+  OTHER = 'OTHER',
+}
+
+export enum CostCentre {
+  FARM = 'FARM',
+  PRODUCTION = 'PRODUCTION',
+  BIOGAS = 'BIOGAS',
+}
+
+

@@ -10,7 +10,6 @@ import 'package:dairy_mobile/features/bmc/domain/bmc_models.dart';
 
 import 'package:dairy_mobile/features/production/presentation/production_screen.dart';
 import 'package:dairy_mobile/features/production/presentation/batch_detail_screen.dart';
-import 'package:dairy_mobile/features/production/presentation/widgets/create_batch_dialog.dart';
 import 'package:dairy_mobile/features/production/presentation/production_provider.dart';
 import 'package:dairy_mobile/features/production/domain/production_models.dart';
 

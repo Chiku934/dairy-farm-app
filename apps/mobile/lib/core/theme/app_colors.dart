@@ -117,5 +117,7 @@ class AppColors {
   static const Color neutral200 = borderSubtle;
   static const Color neutral400 = textMuted;
   static const Color accent = mint;
+  static const Color neutralSecondary = Color(0xFF637066);
+  static const Color neutralLight = Color(0xFFF2F4ED);
 }
 

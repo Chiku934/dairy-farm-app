@@ -14,6 +14,9 @@ import '../features/materials/presentation/materials_screen.dart';
 import '../features/electricity/presentation/electricity_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
+import '../features/biogas/presentation/biogas_screen.dart';
+import '../features/wastage/presentation/wastage_screen.dart';
+import '../features/expenses/presentation/expenses_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -141,15 +144,15 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/biogas',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Biogas Fertiliser', path: '/biogas'),
+      builder: (context, state) => const BiogasScreen(),
     ),
     GoRoute(
       path: '/wastage',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Wastage & Losses', path: '/wastage'),
+      builder: (context, state) => const WastageScreen(),
     ),
     GoRoute(
       path: '/expenses',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Costs & Expenses', path: '/expenses'),
+      builder: (context, state) => const ExpensesScreen(),
     ),
     GoRoute(
       path: '/employees',

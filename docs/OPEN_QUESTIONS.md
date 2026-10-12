@@ -82,3 +82,32 @@
 * **Unresolved Rule:** Should negative stock ever be allowed under emergency flags, or must physical receipts always precede physical dispatches?
 * **Current Action:** Negative stock is strictly prohibited across all inventory categories. Any attempt to issue or dispatch stock beyond `current_stock` results in an HTTP `400 Bad Request` (`INSUFFICIENT_STOCK`).
 
+---
+
+## 5. Biogas Fertiliser, Wastage & Losses and Costs & Expenses (Phase 11)
+
+### 5.1 Biogas Slurry Sourcing & Internal Transfer Valuation
+* **Context:** Biogas digesters consume cow dung slurry produced by the cattle herd to generate bio-methane fuel and dry bio-fertiliser.
+* **Unresolved Rule:** Should the slurry input carry an internal transfer cost credited to the herd cost center and debited to the biogas cost center, or is slurry treated as an uncosted operational by-product?
+* **Open Options:**
+  - Option A: Value slurry at a fixed nominal rate (e.g. ₹0.20/kg) as an internal transfer between herd and biogas.
+  - Option B: Treat slurry as zero-cost farm by-product; cost dry bio-fertiliser purely on packaging materials, labour, and utility expenses.
+* **Current Action:** Treated as uncosted operational by-product with zero raw material debit; only downstream packaging and utilities constitute explicit cost components.
+
+### 5.2 Wastage Salvage Disposition & Secondary Income
+* **Context:** Curdled BMC milk or rejected batch dairy products are sometimes sold to local piggeries, soapmakers, or compost pits at discounted salvage rates.
+* **Unresolved Rule:** Should salvage sales directly credit the wastage loss ledger, or must wastage remain an immutable loss record with salvage proceeds booked under miscellaneous revenue?
+* **Open Options:**
+  - Option A: Net-off salvage income against `wastage_records.estimated_loss_cost`.
+  - Option B: Keep `wastage_records.estimated_loss_cost` at full cost of production and record salvage proceeds in customer cash payments / miscellaneous revenue.
+* **Current Action:** Full loss value is captured in `wastage_records`; any secondary liquidation is processed via separate sales receipts without mutating loss records.
+
+### 5.3 Utility Readings vs. Operating Expense Invoices Integration
+* **Context:** Electricity consumption is logged in `electricity_readings` with calculated total cost based on tariff rates. State electricity board utility power bills arrive monthly as consolidated financial invoices.
+* **Unresolved Rule:** Should meter readings automatically generate corresponding entries in `operating_expenses`, or are operating expenses strictly reserved for audited cash/bank invoice payments?
+* **Open Options:**
+  - Option A: Automated accrual expense generation upon meter entry.
+  - Option B: Distinct operational meter log vs. financial expense ledger; finance records actual utility invoices in `operating_expenses` for cash-flow accounting.
+* **Current Action:** Meter logs and expense entries remain distinct; electricity bills are entered under `operating_expenses` (`category = 'ELECTRICITY'`) upon actual payment settlement.
+
+

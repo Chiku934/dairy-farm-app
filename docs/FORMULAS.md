@@ -282,4 +282,59 @@ Quality testing applies to `INTAKE`, `PRODUCTION_BATCH`, or `BMC`. All readings 
 * **Idempotency Protection:**
   Unique constraints on `receipt_number`, `order_number`, `dispatch_number`, and `payment_number` prevent accidental duplicate form submissions.
 
+---
+
+## 7. Biogas Fertiliser, Wastage & Losses and Costs & Expenses (`REQ-BS-18`, `REQ-BS-19`, `REQ-BS-20`)
+
+### 7.1 Biogas Fertiliser Output, Packaging & Yield
+* **Total Packaged Bag Mass:**
+  $$W_{\text{packed}} = (N_{1\text{kg}} \times 1) + (N_{5\text{kg}} \times 5) + (N_{25\text{kg}} \times 25) + (N_{50\text{kg}} \times 50)$$
+  - Constraint: $W_{\text{packed}} \le \text{dry\_fertiliser\_output\_kg}$
+  - Remaining loose fertiliser: $\text{loose\_output\_kg} = \text{dry\_fertiliser\_output\_kg} - W_{\text{packed}}$
+* **Biogas Slurry Yield Rate:**
+  $$\text{Yield Percentage} = \begin{cases}
+  \left(\dfrac{\text{dry\_fertiliser\_output\_kg}}{\text{slurry\_input\_kg}}\right) \times 100\% & \text{if } \text{slurry\_input\_kg} > 0 \\
+  0\% & \text{otherwise}
+  \end{cases}$$
+* **Inventory Stock Crediting:**
+  When a biogas run specifies destination `'STORE_STOCK'` and is linked to an active `stock_item_id`:
+  $$\text{stock\_items.current\_stock} \gets \text{current\_stock} + Q_{\text{output}}$$
+  Recorded in `stock_ledger_entries` with `transaction_type = 'RECEIPT'`, `quantity_change = +Q_{\text{output}}`, and `reference_id = run_number`.
+
+### 7.2 Wastage & Spoilage Loss Valuation
+* **Supply & Master Stock Wastage:**
+  When wastage is recorded for `stock_type = 'SUPPLY'` referencing a `stock_item_id`:
+  $$\text{estimated\_loss\_cost} = Q_{\text{lost}} \times \text{stock\_items.weighted\_avg\_price}$$
+  - **Sufficiency Constraint:** $\text{stock\_items.current\_stock} \ge Q_{\text{lost}}$.
+  - If $\text{current\_stock} < Q_{\text{lost}}$, the transaction is rejected with HTTP `400 Bad Request` (`INSUFFICIENT_STOCK`).
+  - **Ledger Deduction:**
+    $$\text{stock\_items.current\_stock} \gets \text{current\_stock} - Q_{\text{lost}}$$
+    Recorded in `stock_ledger_entries` with:
+    - `transaction_type = 'WASTAGE'`
+    - `quantity_change = -Q_{\text{lost}}`
+    - `balance_after = \text{stock\_items.current\_stock}`
+    - `unit_cost = \text{stock\_items.weighted\_avg\_price}`
+    - `reference_id = wastage_number`
+* **BMC Intake Milk Spoilage:**
+  When `stock_type = 'BMC'` referencing `bmc_intake_logs`:
+  $$\text{estimated\_loss\_cost} = Q_{\text{lost}} \times \begin{cases}
+  \left(\dfrac{\text{external\_total\_cost}}{\text{quantity\_litres}}\right) & \text{if source is EXTERNAL and cost } > 0 \\
+  P_{\text{base\_milk}} \text{ (₹32.00/L)} & \text{if source is FARM or cost is unspecified}
+  \end{cases}$$
+* **Bulk & Packaged Dairy Batch Spoilage:**
+  When `stock_type IN ('BULK_PRODUCT', 'PACKAGED_PRODUCT')` referencing `production_batches`:
+  $$\text{estimated\_loss\_cost} = Q_{\text{lost}} \times \text{batch\_unit\_cost}$$
+
+### 7.3 Operating Expenses & Cost Centre Aggregation
+* **Non-Negative Expense Guard:**
+  $$\text{amount} > 0.00$$
+  Zero or negative expenses are rejected with HTTP `400 Bad Request`.
+* **Cost Centre Allocation Equation:**
+  $$\text{TotalExpense}_{\text{centre}} = \sum_{e \in E_{\text{centre}}} e.\text{amount} \quad \text{where } \text{centre} \in \{\text{'FARM'}, \text{'PRODUCTION'}, \text{'BIOGAS'}\}$$
+* **Category Breakdown:**
+  $$\text{CategoryTotal}_{c} = \sum_{e \in E_c} e.\text{amount} \quad \text{where } c \in \text{ExpenseCategory}$$
+* **Duplicate Invoice Protection:**
+  Duplicate submissions of identical vendor invoices (`invoice_number` for the same payee and cost centre) or repeated `expense_number` generate HTTP `409 Conflict`.
+
+
 

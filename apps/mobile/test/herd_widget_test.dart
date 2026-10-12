@@ -7,7 +7,6 @@ import 'package:dairy_mobile/features/herd/presentation/animal_detail_screen.dar
 import 'package:dairy_mobile/features/herd/presentation/herd_provider.dart';
 import 'package:dairy_mobile/features/herd/domain/herd_models.dart';
 import 'package:dairy_mobile/features/herd/domain/health_models.dart';
-import 'package:dairy_mobile/features/herd/domain/breeding_models.dart';
 import 'package:dairy_mobile/features/herd/presentation/widgets/animal_card.dart';
 import 'package:dairy_mobile/features/herd/presentation/widgets/reminders_banner.dart';
 import 'package:dairy_mobile/features/herd/presentation/widgets/animal_form_modal.dart';

@@ -58,7 +58,7 @@ INSERT INTO `milking_logs` (`id`, `animal_id`, `record_date`, `session`, `yield_
 ('ml-022', 'c-01', DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'EVENING', 10.80, 'ELIGIBLE', NULL, 'PM session', NOW()),
 ('ml-023', 'c-02', DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'MORNING', 10.10, 'ELIGIBLE', NULL, 'AM session', NOW()),
 ('ml-024', 'c-02', DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'EVENING', 8.40, 'ELIGIBLE', NULL, 'PM session', NOW())
-ON DUPLICATE KEY UPDATE `yield_litres` = VALUES(`yield_litres`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `yield_litres` = VALUES(`yield_litres`);
 
 -- 4. BMC Intake Logs
 INSERT INTO `bmc_intake_logs` (`id`, `batch_number`, `record_date`, `source`, `supplier_route`, `quantity_litres`, `external_total_cost`, `decision`, `temperature_c`, `fat_percentage`, `snf_percentage`, `clr`, `ph`, `notes`, `created_at`) VALUES
@@ -66,18 +66,18 @@ INSERT INTO `bmc_intake_logs` (`id`, `batch_number`, `record_date`, `source`, `s
 ('bmc-02', 'BMC-INT-202610-02', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'FARM', 'Direct Milking Parlour', 72.40, 0.00, 'ACCEPTED', 4.0, 4.15, 8.60, 29.00, 6.68, 'Yesterday farm milk pooled', NOW()),
 ('bmc-03', 'BMC-INT-202610-03', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'EXTERNAL', 'Dandiri Route Collection', 150.00, 5250.00, 'ACCEPTED', 4.2, 4.00, 8.50, 28.50, 6.70, 'External route milk', NOW()),
 ('bmc-04', 'BMC-INT-202610-04', DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'EXTERNAL', 'Sub-Centre B', 40.00, 1400.00, 'REJECTED', 12.5, 3.20, 7.80, 24.00, 6.10, 'Rejected due to high temperature and acidity', NOW())
-ON DUPLICATE KEY UPDATE `quantity_litres` = VALUES(`quantity_litres`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `quantity_litres` = VALUES(`quantity_litres`);
 
 -- 5. Production Batches
 INSERT INTO `production_batches` (`id`, `batch_number`, `record_date`, `product_type`, `bmc_milk_consumed_l`, `finished_quantity`, `unit_of_measure`, `lpg_used_kg`, `byproduct_quantity_kg`, `expiry_date`, `quality_release`, `notes`, `created_at`) VALUES
 ('pb-01', 'BATCH-MILK-001', CURDATE(), 'MILK', 50.00, 100.00, 'LITRE', 0.00, 0.00, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 'APPROVED', 'Pasteurised 500ml pouches', NOW()),
 ('pb-02', 'BATCH-PAN-001', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'PANEER', 120.00, 21.60, 'KG', 2.50, 95.00, DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'APPROVED', 'Fresh malai paneer batch', NOW())
-ON DUPLICATE KEY UPDATE `finished_quantity` = VALUES(`finished_quantity`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `finished_quantity` = VALUES(`finished_quantity`);
 
 -- 6. Wastage Records (BMC / Spoilage)
 INSERT INTO `wastage_records` (`id`, `record_date`, `stock_type`, `reference_id`, `quantity_lost`, `unit`, `reason`, `estimated_loss_cost`, `notes`, `created_by`, `created_at`) VALUES
 ('wst-01', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'BMC', 'TANK-01', 4.50, 'L', 'LEAKAGE', 157.50, 'Transfer valve gasket drip during cleaning', 'usr-dev-manager', NOW())
-ON DUPLICATE KEY UPDATE `quantity_lost` = VALUES(`quantity_lost`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `quantity_lost` = VALUES(`quantity_lost`);
 
 -- 7. Commercial Customers & Sales Dispatches
 INSERT INTO `customers` (`id`, `name`, `phone`, `email`, `address`, `customer_type`, `credit_limit`, `current_balance`, `is_active`, `created_at`) VALUES
@@ -89,21 +89,21 @@ INSERT INTO `sales_dispatches` (`id`, `dispatch_number`, `order_id`, `customer_i
 ('dsp-01', 'DSP-202610-001', NULL, 'cust-01', CURDATE(), NULL, 'MILK', 80, 32.00, 2560.00, 2560.00, 0.00, 'UPI', 'Morning dispatch of fresh pouches', 'usr-dev-admin', NOW()),
 ('dsp-02', 'DSP-202610-002', NULL, 'cust-02', CURDATE(), NULL, 'PANEER', 2, 90.00, 180.00, 180.00, 0.00, 'CASH', 'Retail paneer sale', 'usr-dev-admin', NOW()),
 ('dsp-03', 'DSP-202610-003', NULL, 'cust-01', DATE_SUB(CURDATE(), INTERVAL 1 DAY), NULL, 'MILK', 100, 32.00, 3200.00, 2000.00, 1200.00, 'BANK_TRANSFER', 'Yesterday morning route delivery', 'usr-dev-admin', NOW())
-ON DUPLICATE KEY UPDATE `total_amount` = VALUES(`total_amount`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `total_amount` = VALUES(`total_amount`);
 
 -- 8. Operating Expenses & Electricity Readings
 INSERT INTO `operating_expenses` (`id`, `record_date`, `cost_centre`, `category`, `amount`, `production_batch_id`, `payee`, `payment_method`, `notes`, `created_by`, `created_at`) VALUES
 ('exp-01', CURDATE(), 'FARM', 'MAINTENANCE', 350.00, NULL, 'Local Hardware Dandiri', 'CASH', 'Milking parlour washdown nozzle repair', 'usr-dev-manager', NOW()),
 ('exp-02', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'FARM', 'VET', 650.00, NULL, 'Dr. B. K. Panda (Veterinary surgeon)', 'UPI', 'Treatment and check-up for mastitis prevention', 'usr-dev-manager', NOW()),
 ('exp-03', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'PRODUCTION', 'CLEANING', 420.00, NULL, 'Chemical Supplies Koraput', 'CASH', 'CIP cleaning acid & sanitizer', 'usr-dev-manager', NOW())
-ON DUPLICATE KEY UPDATE `amount` = VALUES(`amount`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `amount` = VALUES(`amount`);
 
 INSERT INTO `electricity_readings` (`id`, `record_date`, `department`, `units_kwh`, `tariff_rate`, `total_cost`, `notes`, `created_by`, `created_at`) VALUES
 ('el-01', CURDATE(), 'FARM', 48.00, 1.40, 67.20, 'Parlour meter reading', 'usr-dev-manager', NOW()),
 ('el-02', CURDATE(), 'PRODUCTION', 185.00, 1.40, 259.00, 'Cold room and processing meter', 'usr-dev-manager', NOW()),
 ('el-03', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'FARM', 52.00, 1.40, 72.80, 'Parlour meter reading', 'usr-dev-manager', NOW()),
 ('el-04', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'PRODUCTION', 190.00, 1.40, 266.00, 'Processing plant meter', 'usr-dev-manager', NOW())
-ON DUPLICATE KEY UPDATE `total_cost` = VALUES(`total_cost`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `total_cost` = VALUES(`total_cost`);
 
 -- 9. Active Employees (Farm Salaries)
 INSERT INTO `employees` (`id`, `employee_code`, `full_name`, `department`, `job_title`, `joining_date`, `monthly_salary`, `is_active`, `phone`, `email`, `created_at`) VALUES
@@ -116,7 +116,7 @@ ON DUPLICATE KEY UPDATE `monthly_salary` = VALUES(`monthly_salary`);
 INSERT INTO `biogas_runs` (`id`, `record_date`, `slurry_input_kg`, `dry_fertiliser_output_kg`, `moisture_pct`, `bags_packed_1kg`, `bags_packed_5kg`, `bags_packed_25kg`, `bags_packed_50kg`, `notes`, `created_by`, `created_at`) VALUES
 ('bio-01', CURDATE(), 450.00, 75.00, 14.50, 0, 5, 2, 0, 'Morning drying bed batch', 'usr-dev-manager', NOW()),
 ('bio-02', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 500.00, 85.00, 15.00, 10, 10, 1, 0, 'Yesterday solar drying cycle', 'usr-dev-manager', NOW())
-ON DUPLICATE KEY UPDATE `dry_fertiliser_output_kg` = VALUES(`dry_fertiliser_output_kg`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `dry_fertiliser_output_kg` = VALUES(`dry_fertiliser_output_kg`);
 
 -- 11. Regulatory Licences (Expiring Alert Trigger)
 INSERT INTO `regulatory_licences` (`id`, `licence_name`, `licence_number`, `issuing_authority`, `licence_holder`, `issue_date`, `expiry_date`, `reminder_days_before`, `status`, `notes`, `created_at`) VALUES
@@ -127,11 +127,11 @@ ON DUPLICATE KEY UPDATE `expiry_date` = VALUES(`expiry_date`), `status` = VALUES
 -- 12. Health & Veterinary Alerts (Milk Withdrawal Safety)
 INSERT INTO `health_records` (`id`, `animal_id`, `record_date`, `care_type`, `medicine_vaccine`, `prescribed_dose`, `veterinarian`, `next_due_date`, `withdrawal_until`, `notes`, `created_at`) VALUES
 ('hl-01', 'c-04', DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'TREATMENT', 'Ceftiofur Sodium Injection', '10ml IM', 'Dr. B. K. Panda', DATE_ADD(CURDATE(), INTERVAL 2 DAY), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 'Mild udder inflammation. Milk withheld for 72h.', NOW())
-ON DUPLICATE KEY UPDATE `withdrawal_until` = VALUES(`withdrawal_until`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `withdrawal_until` = VALUES(`withdrawal_until`);
 
 -- 13. Breeding Records (Upcoming Calving Alert)
 INSERT INTO `breeding_records` (`id`, `animal_id`, `record_date`, `event_type`, `sire_semen_id`, `expected_calving_date`, `calf_tag`, `notes`, `created_by`, `created_at`) VALUES
 ('br-01', 'c-06', DATE_SUB(CURDATE(), INTERVAL 272 DAY), 'PREGNANCY_CONFIRMED', 'SIRE-GIR-PRIME-09', DATE_ADD(CURDATE(), INTERVAL 8 DAY), NULL, 'Cow Yamuna expected calving within 8 days', 'usr-dev-manager', NOW())
-ON DUPLICATE KEY UPDATE `expected_calving_date` = VALUES(`expected_calving_date`);
+ON DUPLICATE KEY UPDATE `record_date` = VALUES(`record_date`), `expected_calving_date` = VALUES(`expected_calving_date`);
 
 SET FOREIGN_KEY_CHECKS = 1;
