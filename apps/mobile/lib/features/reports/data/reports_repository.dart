@@ -1,5 +1,11 @@
+import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/report_models.dart';
+
+/// Top-level isolate computation handler to parse large report payloads off the UI isolate
+ReportResultModel _parseReportPayload(Map<String, dynamic> dataMap) {
+  return ReportResultModel.fromJson(dataMap);
+}
 
 class ReportsRepository {
   final ApiClient _apiClient;
@@ -35,7 +41,8 @@ class ReportsRepository {
           ? raw['data'] as Map<String, dynamic>
           : raw as Map<String, dynamic>;
 
-      return ReportResultModel.fromJson(dataMap);
+      // Execute CPU-heavy JSON mapping and tabular parsing on background isolate
+      return compute(_parseReportPayload, dataMap);
     } catch (e) {
       rethrow;
     }

@@ -9,6 +9,9 @@ import { AuthenticatedUser } from '../../common/decorators/current-user.decorato
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
+  private cachedSettings: FarmSettingsEntity | null = null;
+  private cacheExpiresAt: number = 0;
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes safe TTL
 
   constructor(
     @InjectRepository(FarmSettingsEntity)
@@ -16,13 +19,29 @@ export class SettingsService {
     private readonly auditService: AuditService,
   ) {}
 
+  invalidateCache(): void {
+    this.cachedSettings = null;
+    this.cacheExpiresAt = 0;
+  }
+
   async getSettings(): Promise<FarmSettingsEntity> {
+    const now = Date.now();
+    if (this.cachedSettings && now < this.cacheExpiresAt) {
+      return this.cachedSettings;
+    }
+
     const settings = await this.settingsRepo.findOne({ where: { id: 1 } });
     if (!settings) {
       // Create initial record if missing
       const initial = this.settingsRepo.create({ id: 1 });
-      return this.settingsRepo.save(initial);
+      const saved = await this.settingsRepo.save(initial);
+      this.cachedSettings = saved;
+      this.cacheExpiresAt = now + this.CACHE_TTL_MS;
+      return saved;
     }
+
+    this.cachedSettings = settings;
+    this.cacheExpiresAt = now + this.CACHE_TTL_MS;
     return settings;
   }
 
@@ -39,6 +58,9 @@ export class SettingsService {
       Object.assign(settings, dto);
     }
     const saved = await this.settingsRepo.save(settings);
+
+    // Invalidate cached copy immediately upon persistence
+    this.invalidateCache();
 
     await this.auditService.logAction({
       userId: user?.userId,

@@ -14,6 +14,13 @@ import { CreateLookupCategoryDto, CreateLookupValueDto } from './dto/create-look
 
 @Injectable()
 export class MasterDataService {
+  private cachedUoms: UnitOfMeasurementEntity[] | null = null;
+  private uomsExpiresAt: number = 0;
+  private cachedCategories: LookupCategoryEntity[] | null = null;
+  private categoriesExpiresAt: number = 0;
+  private readonly cachedValues = new Map<string, { expiresAt: number; data: LookupValueEntity[] }>();
+  private readonly CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes TTL for master data
+
   constructor(
     @InjectRepository(UnitOfMeasurementEntity)
     private readonly uomRepo: Repository<UnitOfMeasurementEntity>,
@@ -24,12 +31,38 @@ export class MasterDataService {
     private readonly dataSource: DataSource,
   ) {}
 
+  invalidateUomCache(): void {
+    this.cachedUoms = null;
+    this.uomsExpiresAt = 0;
+  }
+
+  invalidateLookupCache(categoryCode?: string): void {
+    this.cachedCategories = null;
+    this.categoriesExpiresAt = 0;
+    if (categoryCode) {
+      this.cachedValues.delete(categoryCode.toUpperCase());
+    } else {
+      this.cachedValues.clear();
+    }
+  }
+
   async getAllUoms(isActiveOnly = true): Promise<UnitOfMeasurementEntity[]> {
+    const now = Date.now();
+    if (isActiveOnly && this.cachedUoms && now < this.uomsExpiresAt) {
+      return this.cachedUoms;
+    }
+
     const qb = this.uomRepo.createQueryBuilder('uom');
     if (isActiveOnly) {
       qb.where('uom.isActive = :isActive', { isActive: true });
     }
-    return qb.orderBy('uom.dimension', 'ASC').addOrderBy('uom.name', 'ASC').getMany();
+    const results = await qb.orderBy('uom.dimension', 'ASC').addOrderBy('uom.name', 'ASC').getMany();
+
+    if (isActiveOnly) {
+      this.cachedUoms = results;
+      this.uomsExpiresAt = now + this.CACHE_TTL_MS;
+    }
+    return results;
   }
 
   async createUom(dto: CreateUomDto): Promise<UnitOfMeasurementEntity> {
@@ -38,7 +71,7 @@ export class MasterDataService {
       throw new ConflictException(`UOM with code ${dto.code} already exists`);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const uom = manager.create(UnitOfMeasurementEntity, {
         id: uuidv4(),
         code: dto.code.toUpperCase(),
@@ -50,13 +83,25 @@ export class MasterDataService {
       });
       return manager.save(UnitOfMeasurementEntity, uom);
     });
+
+    this.invalidateUomCache();
+    return result;
   }
 
   async getAllCategories(): Promise<LookupCategoryEntity[]> {
-    return this.categoryRepo.find({
+    const now = Date.now();
+    if (this.cachedCategories && now < this.categoriesExpiresAt) {
+      return this.cachedCategories;
+    }
+
+    const results = await this.categoryRepo.find({
       relations: ['values'],
       order: { name: 'ASC' },
     });
+
+    this.cachedCategories = results;
+    this.categoriesExpiresAt = now + this.CACHE_TTL_MS;
+    return results;
   }
 
   async createCategory(dto: CreateLookupCategoryDto): Promise<LookupCategoryEntity> {
@@ -71,22 +116,37 @@ export class MasterDataService {
       name: dto.name,
       description: dto.description || null,
     });
-    return this.categoryRepo.save(category);
+    const saved = await this.categoryRepo.save(category);
+
+    this.invalidateLookupCache();
+    return saved;
   }
 
   async getValuesByCategory(
     categoryCode: string,
     isActiveOnly = true,
   ): Promise<LookupValueEntity[]> {
+    const codeKey = categoryCode.toUpperCase();
+    const now = Date.now();
+    const cached = this.cachedValues.get(codeKey);
+    if (isActiveOnly && cached && now < cached.expiresAt) {
+      return cached.data;
+    }
+
     const qb = this.valueRepo
       .createQueryBuilder('val')
-      .where('val.categoryCode = :categoryCode', { categoryCode: categoryCode.toUpperCase() });
+      .where('val.categoryCode = :categoryCode', { categoryCode: codeKey });
 
     if (isActiveOnly) {
       qb.andWhere('val.isActive = :isActive', { isActive: true });
     }
 
-    return qb.orderBy('val.sortOrder', 'ASC').addOrderBy('val.label', 'ASC').getMany();
+    const results = await qb.orderBy('val.sortOrder', 'ASC').addOrderBy('val.label', 'ASC').getMany();
+
+    if (isActiveOnly) {
+      this.cachedValues.set(codeKey, { expiresAt: now + this.CACHE_TTL_MS, data: results });
+    }
+    return results;
   }
 
   async createLookupValue(dto: CreateLookupValueDto): Promise<LookupValueEntity> {
@@ -109,7 +169,7 @@ export class MasterDataService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const val = manager.create(LookupValueEntity, {
         id: uuidv4(),
         categoryCode: dto.categoryCode.toUpperCase(),
@@ -121,5 +181,8 @@ export class MasterDataService {
       });
       return manager.save(LookupValueEntity, val);
     });
+
+    this.invalidateLookupCache(dto.categoryCode);
+    return result;
   }
 }

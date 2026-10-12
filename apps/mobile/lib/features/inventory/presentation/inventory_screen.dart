@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/debouncer.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../domain/inventory_models.dart';
 import 'inventory_provider.dart';
@@ -19,6 +20,7 @@ class InventoryScreen extends ConsumerStatefulWidget {
 class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _searchController = TextEditingController();
+  final _searchDebouncer = Debouncer(delay: const Duration(milliseconds: 300));
 
   @override
   void initState() {
@@ -28,6 +30,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
 
   @override
   void dispose() {
+    _searchDebouncer.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -125,131 +128,161 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
 
               return RefreshIndicator(
                 onRefresh: () async => ref.invalidate(inventoryItemsProvider),
-                child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    // Metric Summary Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildMetricCard(
-                            'Total Items',
-                            '${items.length}',
-                            Icons.category_outlined,
-                            AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: _buildMetricCard(
-                            'Low Stock',
-                            '$lowStockCount items',
-                            Icons.warning_amber_outlined,
-                            lowStockCount > 0 ? AppColors.error : AppColors.success,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: _buildMetricCard(
-                            'Valuation',
-                            '₹${totalValuation.toStringAsFixed(0)}',
-                            Icons.account_balance_wallet_outlined,
-                            AppColors.accent,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // Search & Low Stock Toggle
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: 'Search items...',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        ref.read(inventoryFilterProvider.notifier).setSearch(null);
-                                      },
-                                    )
-                                  : null,
-                              isDense: true,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onSubmitted: (q) {
-                              ref.read(inventoryFilterProvider.notifier).setSearch(q.isEmpty ? null : q);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        FilterChip(
-                          selected: filter.lowStockOnly == true,
-                          label: const Text('Low Stock Only'),
-                          onSelected: (_) {
-                            ref.read(inventoryFilterProvider.notifier).toggleLowStockOnly();
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // Category Filter Chips
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          FilterChip(
-                            selected: filter.category == null,
-                            label: const Text('All Categories'),
-                            onSelected: (_) {
-                              ref.read(inventoryFilterProvider.notifier).setCategory(null);
-                            },
-                          ),
-                          ...StockCategory.values.map((c) {
-                            return Padding(
-                              padding: const EdgeInsets.only(left: 6),
-                              child: FilterChip(
-                                selected: filter.category == c,
-                                label: Text(c.label),
-                                onSelected: (_) {
-                                  ref.read(inventoryFilterProvider.notifier).setCategory(c);
-                                },
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    if (items.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.xxl),
-                        alignment: Alignment.center,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      sliver: SliverToBoxAdapter(
                         child: Column(
                           children: [
-                            const Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.neutral400),
-                            const SizedBox(height: AppSpacing.md),
-                            Text('No inventory items found', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: AppSpacing.sm),
-                            const Text('Add raw feed ingredients, packaging, or consumables.'),
-                            const SizedBox(height: AppSpacing.lg),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.add),
-                              label: const Text('Add Stock Item'),
-                              onPressed: _openAddDialog,
+                            // Metric Summary Row
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildMetricCard(
+                                    'Total Items',
+                                    '${items.length}',
+                                    Icons.category_outlined,
+                                    AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: _buildMetricCard(
+                                    'Low Stock',
+                                    '$lowStockCount items',
+                                    Icons.warning_amber_outlined,
+                                    lowStockCount > 0 ? AppColors.error : AppColors.success,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: _buildMetricCard(
+                                    'Valuation',
+                                    '₹${totalValuation.toStringAsFixed(0)}',
+                                    Icons.account_balance_wallet_outlined,
+                                    AppColors.accent,
+                                  ),
+                                ),
+                              ],
                             ),
+                            const SizedBox(height: AppSpacing.md),
+
+                            // Debounced Search & Low Stock Toggle
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    decoration: InputDecoration(
+                                      hintText: 'Search items...',
+                                      prefixIcon: const Icon(Icons.search),
+                                      suffixIcon: _searchController.text.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.clear),
+                                              onPressed: () {
+                                                _searchController.clear();
+                                                _searchDebouncer.cancel();
+                                                ref.read(inventoryFilterProvider.notifier).setSearch(null);
+                                              },
+                                            )
+                                          : null,
+                                      isDense: true,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onChanged: (val) {
+                                      _searchDebouncer.run(() {
+                                        ref.read(inventoryFilterProvider.notifier).setSearch(val.trim().isEmpty ? null : val.trim());
+                                      });
+                                    },
+                                    onSubmitted: (q) {
+                                      _searchDebouncer.cancel();
+                                      ref.read(inventoryFilterProvider.notifier).setSearch(q.isEmpty ? null : q);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                FilterChip(
+                                  selected: filter.lowStockOnly == true,
+                                  label: const Text('Low Stock Only'),
+                                  onSelected: (_) {
+                                    ref.read(inventoryFilterProvider.notifier).toggleLowStockOnly();
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+
+                            // Category Filter Chips
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  FilterChip(
+                                    selected: filter.category == null,
+                                    label: const Text('All Categories'),
+                                    onSelected: (_) {
+                                      ref.read(inventoryFilterProvider.notifier).setCategory(null);
+                                    },
+                                  ),
+                                  ...StockCategory.values.map((c) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(left: 6),
+                                      child: FilterChip(
+                                        selected: filter.category == c,
+                                        label: Text(c.label),
+                                        onSelected: (_) {
+                                          ref.read(inventoryFilterProvider.notifier).setCategory(c);
+                                        },
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
                           ],
+                        ),
+                      ),
+                    ),
+
+                    if (items.isEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                        sliver: SliverToBoxAdapter(
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.xxl),
+                            alignment: Alignment.center,
+                            child: Column(
+                              children: [
+                                const Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.neutral400),
+                                const SizedBox(height: AppSpacing.md),
+                                Text('No inventory items found', style: Theme.of(context).textTheme.titleMedium),
+                                const SizedBox(height: AppSpacing.sm),
+                                const Text('Add raw feed ingredients, packaging, or consumables.'),
+                                const SizedBox(height: AppSpacing.lg),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add Stock Item'),
+                                  onPressed: _openAddDialog,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       )
                     else
-                      ...items.map((item) => _buildStockItemCard(item)),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                        sliver: SliverList.builder(
+                          itemCount: items.length,
+                          itemBuilder: (_, idx) => _buildStockItemCard(items[idx]),
+                        ),
+                      ),
+
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.xl),
+                    ),
                   ],
                 ),
               );

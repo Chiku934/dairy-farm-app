@@ -11,4 +11,13 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
   synchronize: false, // Strict migration-based schema management: NEVER use destructive automatic sync
   logging: process.env.NODE_ENV === 'development',
+  maxQueryExecutionTime: 1000, // Warn about any query running longer than 1 second
+  extra: {
+    connectionLimit: parseInt(process.env.DB_POOL_SIZE || '25', 10),
+    queueLimit: 0,
+    waitForConnections: true,
+    connectTimeout: 10000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+  },
 });

@@ -1,5 +1,68 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import '../storage/secure_storage_service.dart';
+
+/// Interceptor that deduplicates identical concurrent in-flight GET requests,
+/// preventing redundant HTTP calls across the network during rapid UI renders.
+class DeduplicationInterceptor extends Interceptor {
+  final Map<String, Completer<Response>> _inFlight = {};
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.method.toUpperCase() != 'GET' || options.extra['skipDeduplication'] == true) {
+      return handler.next(options);
+    }
+
+    final key = '${options.method}:${options.uri}';
+    if (_inFlight.containsKey(key)) {
+      _inFlight[key]!.future.then(
+        (response) => handler.resolve(Response(
+          requestOptions: options,
+          data: response.data,
+          statusCode: response.statusCode,
+          statusMessage: response.statusMessage,
+          headers: response.headers,
+          isRedirect: response.isRedirect,
+          redirects: response.redirects,
+          extra: response.extra,
+        )),
+        onError: (err) {
+          if (err is DioException) {
+            handler.reject(err);
+          } else {
+            handler.reject(DioException(requestOptions: options, error: err));
+          }
+        },
+      );
+      return;
+    }
+
+    final completer = Completer<Response>();
+    _inFlight[key] = completer;
+    options.extra['_dedupKey'] = key;
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final key = response.requestOptions.extra['_dedupKey'] as String?;
+    if (key != null && _inFlight.containsKey(key)) {
+      final completer = _inFlight.remove(key);
+      completer?.complete(response);
+    }
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final key = err.requestOptions.extra['_dedupKey'] as String?;
+    if (key != null && _inFlight.containsKey(key)) {
+      final completer = _inFlight.remove(key);
+      completer?.completeError(err);
+    }
+    handler.next(err);
+  }
+}
 
 class ApiClient {
   final Dio dio;
@@ -17,6 +80,7 @@ class ApiClient {
             },
           ),
         ) {
+    dio.interceptors.add(DeduplicationInterceptor());
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
