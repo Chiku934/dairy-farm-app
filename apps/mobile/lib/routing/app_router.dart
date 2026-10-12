@@ -19,6 +19,7 @@ import '../features/wastage/presentation/wastage_screen.dart';
 import '../features/expenses/presentation/expenses_screen.dart';
 import '../features/employees/presentation/employees_screen.dart';
 import '../features/licences/presentation/licences_screen.dart';
+import '../features/reports/presentation/reports_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/showcase/presentation/ui_showcase_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -166,7 +167,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/reports',
-      builder: (context, state) => const ModulePlaceholderScreen(title: 'Reports & Exports', path: '/reports'),
+      builder: (context, state) => const ReportsScreen(),
     ),
     GoRoute(
       path: '/settings',

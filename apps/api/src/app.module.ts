@@ -28,6 +28,7 @@ import { WastageModule } from './modules/wastage/wastage.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { LicencesModule } from './modules/licences/licences.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { LicencesModule } from './modules/licences/licences.module';
     ExpensesModule,
     EmployeesModule,
     LicencesModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
